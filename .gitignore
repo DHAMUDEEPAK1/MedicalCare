@@ -1,42 +1,44 @@
 # ── Android / Gradle ─────────────────────────────────────────────────────────
 *.iml
-.gradle
+.gradle/
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
+
+# ── IntelliJ / Android Studio ────────────────────────────────────────────────
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# ── Credentials & Secrets ─────────────────────────────────────────────────────
+*.jks
+*.keystore
+google-services.json
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 
 # ── Node / Frontend ───────────────────────────────────────────────────────────
 node_modules/
 frontend/node_modules/
 frontend/dist/
-frontend/.env
-frontend/.env.local
-frontend/.env.*.local
+dist/
 
 # ── ICP / DFX ─────────────────────────────────────────────────────────────────
 .dfx/
 **/.dfx/
 
-# ── OS files ──────────────────────────────────────────────────────────────────
-.DS_Store
+# ── OS / Logs / Misc ──────────────────────────────────────────────────────────
 Thumbs.db
-
-# ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*
 pnpm-debug.log*
-
-# ── Build artifacts ───────────────────────────────────────────────────────────
-dist/
-build/
 *.class
+*.hprof
