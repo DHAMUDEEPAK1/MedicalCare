@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "dfx": "0.30.2",
+  "canisters": {
+    "backend": {
+      "type": "motoko",
+      "main": "backend/main.mo"
+    },
+    "frontend": {
+      "type": "assets",
+      "source": ["frontend/dist"]
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral",
+      "replica": {
+        "subnet_type": "application"
+      }
+    }
+  }
+}

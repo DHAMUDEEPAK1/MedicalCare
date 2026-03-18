@@ -1,0 +1,164 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Mobile Health Care App — Alternative Theme (Design B) Frontend",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Implement a complete, consistent Design B theme (warm green + neutrals, non-blue/purple) with coherent typography, spacing, surfaces, and component styling across the app UI.",
+      "acceptanceCriteria": [
+        "A clearly distinct theme from a typical default template is applied (colors, type scale, surfaces, buttons, inputs, cards).",
+        "All user-facing text is in English.",
+        "Styling is consistent across screens (no mixed palettes or mismatched typography)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/index.css",
+          "operation": "create",
+          "description": "Create global styles for the app including Design B tokens (CSS variables for colors/surfaces/typography/radius/shadows) and a theme-scoping mechanism (e.g., a theme class/data-attribute) to avoid editing immutable files."
+        },
+        {
+          "path": "frontend/tailwind.config.js",
+          "operation": "modify",
+          "description": "Adjust Tailwind theme extensions (as needed) to support Design B styling via CSS variables (e.g., additional semantic tokens/shadows/radius/typography scale) while keeping all user-facing UI consistent. Use shadcn-ui token patterns where applicable; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/designB/theme.ts",
+          "operation": "create",
+          "description": "Define Design B theme metadata (palette names, font stack recommendations, spacing scale constants) and utilities to apply the theme at runtime without touching immutable paths."
+        },
+        {
+          "path": "frontend/src/designB/components/DesignBSurface.tsx",
+          "operation": "create",
+          "description": "Create a small wrapper component to standardize Design B surfaces (screen background, cards, subtle borders, elevation) composed from existing shadcn-ui primitives; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/designB/components/DesignBTypography.tsx",
+          "operation": "create",
+          "description": "Create typography helpers (page title, section title, caption, body) to keep Design B type scale consistent across all screens; verify the component's usage instructions before implementing."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Create a navigable Design B screen set (Welcome/Onboarding, Sign In, Home/Dashboard, Profile) using realistic placeholder content and in-app navigation.",
+      "acceptanceCriteria": [
+        "Each of the listed screens exists and can be navigated to from within the app.",
+        "Screens use realistic placeholder content (names, dates, specialties) without requiring backend integration.",
+        "No broken navigation links; route changes render the correct screen."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "create",
+          "description": "Create the app root component that wires routing, the Design B layout shell, and in-app navigation (tabs/header) to ensure all required screens are reachable."
+        },
+        {
+          "path": "frontend/src/designB/layout/DesignBAppShell.tsx",
+          "operation": "create",
+          "description": "Create the Design B layout shell with a consistent header and bottom tab navigation, composed from existing shadcn-ui components; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/designB/layout/DesignBBottomTabs.tsx",
+          "operation": "create",
+          "description": "Implement bottom tab navigation (e.g., Home, Profile) with Design B styling and active-state rules. Use existing shadcn-ui Button components for tab items; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/Welcome.tsx",
+          "operation": "create",
+          "description": "Create the Welcome/Onboarding screen using Design B hero illustration, logo mark, and clear English copy demonstrating Design B surfaces/typography; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/SignIn.tsx",
+          "operation": "create",
+          "description": "Create the Sign In screen using Design B form styling (inputs, buttons, helper text) with realistic placeholder content (email, password). Compose shadcn-ui Input/Button/Card; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/HomeDashboard.tsx",
+          "operation": "create",
+          "description": "Create the Home/Dashboard screen with realistic placeholder modules (quick actions, vitals summary) and Design B component styling. Use shadcn-ui Card/Badge/Button; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/pages/Profile.tsx",
+          "operation": "create",
+          "description": "Create the Profile screen with realistic user info, preferences, and a section that demonstrates Design B styling. Compose shadcn-ui Card/Avatar/Button; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/designB/data/placeholders.ts",
+          "operation": "create",
+          "description": "Add centralized realistic placeholder data (user profile, health metrics) used across screens to keep content consistent and English-only."
+        }
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "summary": "Add an in-app runtime toggle to switch between Design B and the default design without editing immutable template files.",
+      "acceptanceCriteria": [
+        "A user can switch to view Design B styling/layout during runtime.",
+        "The switcher does not require changes to immutable paths (e.g., hooks and UI component source directories marked read-only)."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/designB/themeContext.tsx",
+          "operation": "create",
+          "description": "Create a lightweight theme context/provider to track the selected theme (default vs Design B) and apply it at runtime via a non-immutable wrapper (e.g., in App)."
+        },
+        {
+          "path": "frontend/src/designB/components/ThemeSwitcher.tsx",
+          "operation": "create",
+          "description": "Create a simple toggle control for switching themes in-app. Use shadcn-ui Switch and/or Button components; verify the component's usage instructions before implementing."
+        },
+        {
+          "path": "frontend/src/App.tsx",
+          "operation": "modify",
+          "description": "Wire the ThemeSwitcher into the UI (e.g., header/profile) and apply the chosen theme (e.g., set a theme class/data-attribute on an app wrapper element) so switching updates Design B styling during runtime."
+        },
+        {
+          "path": "frontend/src/designB/storage/themePreference.ts",
+          "operation": "create",
+          "description": "Persist the user’s theme selection locally (e.g., localStorage) so Design B remains active after refresh without touching immutable template files."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Add required static images under frontend/public/assets/generated and use them in Design B UI screens without backend fetching.",
+      "acceptanceCriteria": [
+        "Generated images exist at the specified paths under frontend/public/assets/generated.",
+        "Design B screens render the images correctly without fetching them from the backend."
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/public/assets/generated/healthcare-logo.dim_512x512.png",
+          "operation": "create",
+          "description": "Add the generated static image asset: Minimal healthcare app logo mark, rounded geometry, warm green + neutral palette."
+        },
+        {
+          "path": "frontend/public/assets/generated/healthcare-hero.dim_1600x900.png",
+          "operation": "create",
+          "description": "Add the generated static image asset: Welcoming hero illustration (clinician and patient, calm clinic, flat/soft gradient, warm green palette)."
+        },
+        {
+          "path": "frontend/public/assets/generated/healthcare-icons.dim_512x512.png",
+          "operation": "create",
+          "description": "Add the generated static image asset: Sprite sheet/set image containing 6 simple line icons (doctor, calendar, heart, pills, chat bubble, user profile) with consistent stroke width."
+        },
+        {
+          "path": "frontend/src/pages/Welcome.tsx",
+          "operation": "modify",
+          "description": "Wire frontend/public/assets/generated/healthcare-logo.dim_512x512.png and frontend/public/assets/generated/healthcare-hero.dim_1600x900.png into the Welcome/Onboarding screen UI so they render as static assets (no backend fetch)."
+        },
+        {
+          "path": "frontend/src/pages/HomeDashboard.tsx",
+          "operation": "modify",
+          "description": "Use frontend/public/assets/generated/healthcare-icons.dim_512x512.png in the Home/Dashboard screen (e.g., for quick-action visuals) to demonstrate Design B iconography without backend fetching."
+        },
+        {
+          "path": "frontend/src/designB/layout/DesignBBottomTabs.tsx",
+          "operation": "modify",
+          "description": "Optionally reuse frontend/public/assets/generated/healthcare-icons.dim_512x512.png as tab icons (or partial crops as appropriate) to keep Design B navigation visually consistent."
+        }
+      ]
+    }
+  ]
+}

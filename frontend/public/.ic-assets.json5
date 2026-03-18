@@ -1,0 +1,10 @@
+[
+  {
+    "match": ".ic-assets.json5",
+    "ignore": true
+  },
+  {
+    "match": "**/*",
+    "security_policy": "standard"
+  }
+]

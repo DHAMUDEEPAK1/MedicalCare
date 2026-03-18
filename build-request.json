@@ -1,0 +1,106 @@
+{
+  "kind": "build_request",
+  "title": "MedicalCare App",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Implement a complete alternative visual design (Design B) for the Mobile Health Care App inspired by the provided Figma link, including a coherent color palette (avoid blue/purple), typography, spacing system, component styling, and layout rules applied consistently across the app UI.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "https://www.figma.com/make/9Xl9743bgdP8cNMJn4voL0/Mobile-Health-Care-App?p=f&t=7TkWgRMZ4OI4nyFl-0          create a another design"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A clearly distinct theme from a typical default template is applied (colors, type scale, surfaces, buttons, inputs, cards).",
+        "All user-facing text is in English.",
+        "Styling is consistent across screens (no mixed palettes or mismatched typography)."
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "MedicalCare App with at least these routes/pages: Welcome/Onboarding, Sign In, Home/Dashboard, and Profile; each page should be navigable via in-app navigation (tabs and/or header navigation) and should demonstrate the Design B component system.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "create a another design"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Each of the listed screens exists and can be navigated to from within the app.",
+        "Screens use realistic placeholder content (names, dates, specialties) without requiring backend integration.",
+        "No broken navigation links; route changes render the correct screen."
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Add a simple in-app toggle or switcher that allows viewing the alternative Design B UI (and, if an existing design is present, switching between the default design and Design B) without editing any immutable template files.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "create a another design"
+        ]
+      },
+      "acceptanceCriteria": [
+        "A user can switch to view Design B styling/layout during runtime.",
+        "The switcher does not require changes to immutable paths (e.g., hooks and UI component source directories marked read-only)."
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Generate and add the required static images for the Design B theme under frontend/public/assets/generated and use them in the Design B UI.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "create a another design"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Generated images exist at the specified paths under frontend/public/assets/generated.",
+        "Design B screens render the images correctly without fetching them from the backend."
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not edit any files under frontend immutablePaths (including frontend/src/main.tsx and frontend/src/components/ui). Compose existing UI components instead of modifying their sources.",
+    "Backend must remain a single Motoko actor; do not introduce additional backend services or external databases.",
+    "Use English for any user-facing text."
+  ],
+  "nonGoals": [
+    "Reproducing the exact Figma design pixel-for-pixel.",
+    "Implementing real medical workflows (e.g., booking, payments, messaging, prescriptions) unless explicitly requested later.",
+    "Adding third-party authentication providers (only Internet Identity is supported).",
+    "Adding real-time features (websockets/chat/push notifications)."
+  ],
+  "imageRequirements": {
+    "required": [
+      "Minimal healthcare app logo mark, rounded geometry, warm green + neutral palette (healthcare-logo.dim_512x512.png)",
+      "Welcoming hero illustration: clinician and patient in a calm clinic setting, flat/soft gradient style, warm green palette (healthcare-hero.dim_1600x900.png)",
+      "Set of 6 simple line icons: doctor, heart, pills, chat bubble, user profile; consistent stroke width (healthcare-icons.dim_512x512.png)"
+    ],
+    "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
+  }
+}

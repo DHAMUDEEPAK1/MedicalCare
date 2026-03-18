@@ -1,0 +1,71 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-08T14:14:55.777Z",
+  "summary": "Diff adds a Design B themed frontend with TanStack Router routes, a Design B app shell (header + bottom tabs), a runtime theme switcher backed by localStorage and CSS variable overrides via data-design-theme, and mock placeholder data for user profile and health metrics. Evidence for generating/adding the required static image assets under frontend/public/assets/generated is not present in the provided diff summary (may be in omitted files). Several extra infrastructure files (backend actor stub and query/actor hooks) appear unrelated to the UI Design B request.",
+  "missing_requirements": [
+    {
+      "id": "REQ-4",
+      "requirement": "Generate and add the required static images under frontend/public/assets/generated and use them in the Design B UI.",
+      "reason": "The UI references /assets/generated/healthcare-logo.dim_512x512.png, but the diff summary does not show any added files under frontend/public/assets/generated. Because some files are omitted, the assets may exist but are not evidenced here.",
+      "evidence": [
+        "frontend/src/designB/layout/DesignBAppShell.tsx",
+        "<file-diff>: Omitted files due to limits: added=9"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Added an empty backend Motoko actor (actor {}) without any requested backend changes.",
+      "reason": "BuildRequest focuses on an alternative frontend UI design and image assets; no new backend implementation was requested.",
+      "evidence": [
+        "backend/main.mo"
+      ]
+    },
+    {
+      "description": "Added React Query-based actor/query hooks (useActor/useQueries) that are described as scaffolding for future backend integration.",
+      "reason": "Backend integration scaffolding was not requested; requirements explicitly allow placeholder content without backend integration.",
+      "evidence": [
+        "frontend/src/hooks/useActor.ts",
+        "frontend/src/hooks/useQueries.ts"
+      ]
+    },
+    {
+      "description": "Introduced next-themes ThemeProvider wrapping the app.",
+      "reason": "Only a Design B vs default design toggle was requested; using next-themes/dark-mode infrastructure was not explicitly requested.",
+      "evidence": [
+        "frontend/src/App.tsx"
+      ]
+    }
+  ],
+  "confidence": 0.62,
+  "changed_files": [
+    "all_files_summary.json",
+    "backend/main.mo",
+    "frontend-file-summaries.txt",
+    "frontend/index.css",
+    "frontend/index.html",
+    "frontend/src/App.tsx",
+    "frontend/src/designB/components/DesignBSurface.tsx",
+    "frontend/src/designB/components/DesignBTypography.tsx",
+    "frontend/src/designB/components/ThemeSwitcher.tsx",
+    "frontend/src/designB/data/placeholders.ts",
+    "frontend/src/designB/layout/DesignBAppShell.tsx",
+    "frontend/src/designB/layout/DesignBBottomTabs.tsx",
+    "frontend/src/designB/storage/themePreference.ts",
+    "frontend/src/designB/theme.ts",
+    "frontend/src/designB/themeContext.tsx",
+    "frontend/src/hooks/useActor.ts",
+    "frontend/src/hooks/useInternetIdentity.ts",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/index.css",
+    "frontend/src/lib/utils.ts",
+    "frontend/src/main.tsx",
+    "frontend/src/pages/HomeDashboard.tsx",
+    "frontend/src/pages/Profile.tsx",
+    "frontend/src/pages/SignIn.tsx",
+    "frontend/src/pages/Welcome.tsx",
+    "frontend/tailwind.config.js",
+    "project_state.json"
+  ]
+}

@@ -1,0 +1,38 @@
+type UserProfile = 
+ record {
+   allergies: vec Allergy;
+   bio: opt text;
+   bloodType: opt BloodType;
+   dateOfBirth: opt int;
+   email: opt text;
+   emergencyContact: opt EmergencyContact;
+   name: text;
+ };
+type EmergencyContact = 
+ record {
+   name: text;
+   phone: text;
+   relationship: text;
+ };
+type BloodType = 
+ variant {
+   aNegative;
+   aPositive;
+   abNegative;
+   abPositive;
+   bNegative;
+   bPositive;
+   oNegative;
+   oPositive;
+ };
+type Allergy = 
+ record {
+   name: text;
+   reaction: text;
+   severity: text;
+ };
+service : {
+  getCallerUserProfile: () -> (opt UserProfile);
+  isAdmin: () -> (bool) query;
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+}
