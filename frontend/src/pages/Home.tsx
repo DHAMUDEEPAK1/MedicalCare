@@ -324,6 +324,8 @@ export default function Home() {
             caption="Suggested for you"
           />
         </div>
+      </section>
+
       {/* Health Risk Assessment Section */}
       <section className="max-w-4xl mx-auto w-full">
         <HealthRiskAssessment />
