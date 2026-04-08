@@ -6,6 +6,7 @@ import { DashboardSectionHeader } from '../designB/components/DashboardSectionHe
 import { Pill, Bell, CheckCircle2, AlertCircle, Plus, Search, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { loadSession } from '../auth/session';
 import {
   Dialog,
   DialogContent,
@@ -76,12 +77,20 @@ export default function Medications() {
   });
 
   const [medications, setMedications] = useState<Medication[]>(() => {
-    const saved = localStorage.getItem('userMedications');
-    return saved ? JSON.parse(saved) : DEFAULT_MEDS;
+    const session = loadSession();
+    const isGuest = session?.type === 'guest';
+    const storageKey = isGuest ? 'guestMedications' : 'userMedications';
+    
+    const saved = localStorage.getItem(storageKey);
+    if (saved) return JSON.parse(saved);
+    
+    return isGuest ? DEFAULT_MEDS : [];
   });
 
   useEffect(() => {
-    localStorage.setItem('userMedications', JSON.stringify(medications));
+    const session = loadSession();
+    const storageKey = session?.type === 'guest' ? 'guestMedications' : 'userMedications';
+    localStorage.setItem(storageKey, JSON.stringify(medications));
   }, [medications]);
 
   // Global Reminder System

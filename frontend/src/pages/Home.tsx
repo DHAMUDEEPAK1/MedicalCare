@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { Capacitor } from '@capacitor/core';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { loadSession } from '../auth/session';
 import { DashboardSectionHeader } from '../designB/components/DashboardSectionHeader';
 import { DashboardTile } from '../designB/components/DashboardTile';
 import { DesignBSurface } from '../designB/components/DesignBSurface';
@@ -36,13 +37,14 @@ export default function Home() {
 
   const [activeTile, setActiveTile] = useState<string | null>(null);
 
-  // Smartwatch Bluetooth State
+  // Vitals State
   const [pulse, setPulse] = useState<number | null>(null);
-  const [steps, setSteps] = useState<number>(8432);
-  const [waterCups, setWaterCups] = useState<number>(6);
+  const [steps, setSteps] = useState<number>(0);
+  const [waterCups, setWaterCups] = useState<number>(0);
   const [isConnecting, setIsConnecting] = useState(false);
   const [watchName, setWatchName] = useState<string | null>(null);
   const [deviceConnected, setDeviceConnected] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
 
   const [gokuInput, setGokuInput] = useState("");
   const handleAskGoku = (e: React.FormEvent) => {
@@ -57,6 +59,19 @@ export default function Home() {
   const [dynamicInsight, setDynamicInsight] = useState("");
 
   useEffect(() => {
+    const session = loadSession();
+    const guestState = session?.type === 'guest';
+    setIsGuest(guestState);
+
+    if (guestState) {
+      setSteps(8432);
+      setPulse(72);
+      setWaterCups(6);
+      setDynamicInsight("Guest Mode: Using demo health metrics. Sign in to track your actual data.");
+    } else {
+      setDynamicInsight("Ready to sync your real vitals...");
+    }
+
     const fetchHealthData = async () => {
       if (!auth.currentUser) return;
       try {
@@ -95,7 +110,7 @@ export default function Home() {
       }
     };
     fetchHealthData();
-  }, []);
+  }, [isGuest]);
 
   const connectToSmartwatch = async () => {
     try {
@@ -214,6 +229,26 @@ export default function Home() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 space-y-8 pb-24 pt-4">
+      {isGuest && (
+        <DesignBSurface variant="elevated" className="p-4 bg-amber-500/10 border-l-4 border-amber-500 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl animate-in fade-in slide-in-from-top duration-500">
+          <div className="flex items-center gap-3">
+            <div className="bg-amber-500/20 p-2 rounded-lg">
+              <Sparkles className="h-5 w-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-200">Browsing in Guest Mode</p>
+              <p className="text-[10px] text-amber-700/70 dark:text-amber-400/70 uppercase tracking-widest font-bold">Limited demo access with sample data</p>
+            </div>
+          </div>
+          <Button 
+            size="sm" 
+            onClick={() => navigate({ to: '/signin' })} 
+            className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white border-none text-xs font-bold rounded-lg shadow-lg shadow-amber-500/20"
+          >
+            Sign In for Your Data
+          </Button>
+        </DesignBSurface>
+      )}
       <div className="space-y-2 flex flex-col items-center text-center">
         <PageTitle>Health Dashboard</PageTitle>
         <BodyText className="text-muted-foreground max-w-lg">
