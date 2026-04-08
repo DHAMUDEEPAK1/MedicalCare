@@ -364,6 +364,15 @@ Vitamins and minerals are micronutrients your body needs in small amounts for hu
 
 export function getGeneralKnowledgeResponse(input: string): string | null {
   const lower = input.toLowerCase();
+  
+  // Medical document context (prevent trigger if user is asking to analyze already uploaded content)
+  const isRequestingAnalysis = lower.includes("analyze it") || lower.includes("check it") || 
+                             lower.includes("examine it") || lower.includes("tell me about it");
+
+  if (!isRequestingAnalysis && (lower.includes("report") || lower.includes("medical") || lower.includes("lab") || 
+      lower.includes("test") || lower.includes("analysis"))) {
+    return `### 🐉 Goku\n\n## Medical Document Analysis\n\nI can analyze your medical report to:\n\n• Identify key lab results (Hemoglobin, Glucose, Cholesterol, Blood Pressure)\n• Highlight abnormal values\n• Explain what the results mean\n• Suggest next steps\n\nPlease share your report text or upload the document for a detailed analysis.\n\n*This is for educational purposes only - always consult your healthcare provider for medical advice.*`;
+  }
 
   let bestMatch: GeneralTopic | null = null;
   let bestScore = 0;

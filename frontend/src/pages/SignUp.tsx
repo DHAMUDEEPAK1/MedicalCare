@@ -4,21 +4,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PageTitle } from '../designB/components/DesignBTypography';
-import { Loader2, UserPlus, AlertCircle, Eye, EyeOff } from 'lucide-react';
-import { auth, saveToFirebase, db } from '../lib/firebase';
+import { Loader2, UserPlus, AlertCircle, Eye, EyeOff, Mail, User, Lock } from 'lucide-react';
+import { auth, db } from '../lib/firebase';
 import { createUserWithEmailAndPassword, updateProfile, GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useEffect } from 'react';
+import { toast } from 'sonner';
 
 export default function SignUp() {
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
-  const ObjectEmailPhone = useState('');
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +32,11 @@ export default function SignUp() {
       if (user) {
         setCurrentUser(user);
         setCompleteProfileMode(true);
-        if (user.email) setLoginIdentifier(user.email);
-        else if (user.phoneNumber) setLoginIdentifier(user.phoneNumber);
+        if (user.email) setIdentifier(user.email);
+        else if (user.phoneNumber) setIdentifier(user.phoneNumber);
+      } else {
+        setCompleteProfileMode(false);
+        setCurrentUser(null);
       }
     });
     return () => unsubscribe();
@@ -44,36 +46,28 @@ export default function SignUp() {
     e.preventDefault();
     setError(null);
 
-    // Validation
     if (!fullName.trim()) {
       setError('Please enter your full name.');
       return;
     }
 
-    let authEmail = loginIdentifier.trim();
-    if (!authEmail) {
-      setError('Please enter your phone or email.');
+    const cleanId = identifier.trim();
+    if (!cleanId) {
+      setError('Please enter your email or phone number.');
       return;
     }
 
-    if (!authEmail.includes('@')) {
-      const digits = authEmail.replace(/\D/g, '');
-      if (digits.length >= 10) {
-        authEmail = `${digits}@medicalcare.local`;
-      } else {
-        setError('Please enter a valid email or 10-digit phone number.');
-        return;
-      }
+    // If they enter a phone number in the Sign Up page, we should encourage them to use Sign In (OTP)
+    // as Firebase Phone Auth creates the account automatically.
+    if (!cleanId.includes('@') && !completeProfileMode) {
+      toast.info('Phone registration is handled via Secure OTP. Redirecting...');
+      navigate({ to: '/signin' });
+      return;
     }
 
     if (!completeProfileMode) {
-      if (!password || password.length < 5) {
-        setError('Password must be at least 5 characters long.');
-        return;
-      }
-      const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{5,}$/;
-      if (!passwordRegex.test(password)) {
-        setError('Password must contain at least 1 uppercase letter, 1 special character, and 1 number.');
+      if (!password || password.length < 6) {
+        setError('Password must be at least 6 characters long.');
         return;
       }
     }
@@ -82,29 +76,40 @@ export default function SignUp() {
 
     try {
       if (completeProfileMode && currentUser) {
+        // Complete profile for existing user (OTP or Google)
         await updateProfile(currentUser, { displayName: fullName });
         await setDoc(doc(db, 'users', currentUser.uid), {
           name: fullName,
-          email: currentUser.email || authEmail || '',
+          email: currentUser.email || '',
           phone: currentUser.phoneNumber || '',
           timestamp: serverTimestamp(),
-        });
+          role: 'user'
+        }, { merge: true });
+        
+        toast.success('Profile completed successfully!');
         navigate({ to: '/home' });
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, authEmail, password);
+        // New Email/Password registration
+        const userCredential = await createUserWithEmailAndPassword(auth, cleanId, password);
         await updateProfile(userCredential.user, { displayName: fullName });
         await setDoc(doc(db, 'users', userCredential.user.uid), {
           name: fullName,
-          email: authEmail,
+          email: cleanId,
           timestamp: serverTimestamp(),
+          role: 'user'
         });
+        
+        toast.success('Account created successfully!');
         navigate({ to: '/home' });
       }
     } catch (err: any) {
+      console.error("Sign up error:", err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('This email or phone number is already registered. Please sign in instead.');
+        setError('This email is already registered. Please sign in instead.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Please enter a valid email address.');
       } else {
-        setError(err.message || 'Failed to create account. Please try again.');
+        setError(err.message || 'Failed to create account.');
       }
     } finally {
       setIsProcessing(false);
@@ -118,13 +123,15 @@ export default function SignUp() {
       const provider = new GoogleAuthProvider();
       const userCredential = await signInWithPopup(auth, provider);
 
-      // Attempt to save profile, may overwrite if exists (safe for demo)
+      // Save initial profile
       await setDoc(doc(db, 'users', userCredential.user.uid), {
         name: userCredential.user.displayName || 'Google User',
         email: userCredential.user.email,
         timestamp: serverTimestamp(),
-      });
+        role: 'user'
+      }, { merge: true });
 
+      toast.success('Successfully connected with Google');
       navigate({ to: '/home' });
     } catch (err: any) {
       setError(err.message || 'Google sign-in failed.');
@@ -134,31 +141,37 @@ export default function SignUp() {
   };
 
   return (
-    <div className="container max-w-md mx-auto px-4 py-12">
+    <div className="container max-w-md mx-auto px-4 py-12 animate-fade-in-up">
       <div className="space-y-8">
         <div className="text-center space-y-2">
           <img
             src="/assets/generated/healthcare-logo.dim_512x512.png"
             alt="HealthCare Logo"
-            className="h-16 w-16 mx-auto mb-4"
+            className="h-20 w-20 mx-auto mb-4 animate-float"
+            onClick={() => navigate({ to: '/' })}
           />
-          <PageTitle>Create Account</PageTitle>
-          <p className="text-muted-foreground">
-            Join us to access your health dashboard
+          <PageTitle className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+            {completeProfileMode ? 'Final Step' : 'Get Started'}
+          </PageTitle>
+          <p className="text-muted-foreground text-lg">
+            {completeProfileMode ? 'Tell us a bit about yourself' : 'Create your secure health account'}
           </p>
         </div>
 
-        <Card>
+        <Card className="border-none shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden rounded-3xl backdrop-blur-sm bg-card/80">
+          <div className="h-2 bg-gradient-to-r from-primary via-blue-500 to-primary" />
           <CardHeader>
-            <CardTitle>{completeProfileMode ? 'Complete Profile' : 'Sign Up'}</CardTitle>
+            <CardTitle className="text-2xl">{completeProfileMode ? 'Complete Profile' : 'Sign Up'}</CardTitle>
             <CardDescription>
-              {completeProfileMode ? 'Finish setting up your account details' : 'Enter your details to create a new account'}
+              {completeProfileMode ? 'Finish setting up your account details' : 'Join thousands managing their health with AI'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-2 group">
+                <Label htmlFor="fullName" className="flex items-center gap-2 text-sm font-semibold mb-1 grayscale group-focus-within:grayscale-0 transition-all">
+                  <User className="h-4 w-4" /> Full Name
+                </Label>
                 <Input
                   id="fullName"
                   type="text"
@@ -166,25 +179,31 @@ export default function SignUp() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   required
+                  className="h-12 rounded-xl border-muted-foreground/20 focus:border-primary transition-all bg-muted/30"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="loginIdentifier">Phone or Email</Label>
+              <div className="space-y-2 group">
+                <Label htmlFor="identifier" className="flex items-center gap-2 text-sm font-semibold mb-1 grayscale group-focus-within:grayscale-0 transition-all">
+                  <Mail className="h-4 w-4" /> Email address
+                </Label>
                 <Input
-                  id="loginIdentifier"
+                  id="identifier"
                   type="text"
-                  placeholder="your.email@example.com or 1234567890"
-                  value={loginIdentifier}
-                  onChange={(e) => setLoginIdentifier(e.target.value)}
+                  placeholder="name@example.com"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   required
                   disabled={completeProfileMode}
+                  className="h-12 rounded-xl border-muted-foreground/20 focus:border-primary transition-all bg-muted/30 disabled:opacity-70"
                 />
               </div>
 
               {!completeProfileMode && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
+                <div className="space-y-2 group">
+                  <Label htmlFor="password" className="flex items-center gap-2 text-sm font-semibold mb-1 grayscale group-focus-within:grayscale-0 transition-all">
+                    <Lock className="h-4 w-4" /> Create Password
+                  </Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -193,89 +212,88 @@ export default function SignUp() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="pr-10"
+                      className="h-12 rounded-xl border-muted-foreground/20 focus:border-primary transition-all bg-muted/30 pr-12"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
               )}
 
               {error && (
-                <Alert variant="destructive">
+                <Alert variant="destructive" className="rounded-xl border-destructive/20 bg-destructive/5 animate-in shake-1 duration-300">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
 
-              <Button type="submit" className="w-full" disabled={isProcessing || isGoogleLoading}>
+              <Button type="submit" className="w-full h-12 rounded-xl text-md font-semibold bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all active:scale-[0.98]" disabled={isProcessing || isGoogleLoading}>
                 {isProcessing ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {completeProfileMode ? 'Saving...' : 'Creating Account...'}
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    {completeProfileMode ? 'Saving...' : 'Creating...'}
                   </>
                 ) : (
                   <>
-                    <UserPlus className="mr-2 h-4 w-4" />
+                    <UserPlus className="mr-2 h-5 w-5" />
                     {completeProfileMode ? 'Finish Registration' : 'Create Account'}
                   </>
                 )}
               </Button>
             </form>
 
-            <div className="relative mt-6">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-              </div>
-            </div>
+            {!completeProfileMode && (
+              <>
+                <div className="relative mt-8">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-3 text-muted-foreground font-medium tracking-wider">Faster with Google</span>
+                  </div>
+                </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mt-4 relative bg-white text-zinc-800 hover:bg-zinc-50 border-zinc-200"
-              onClick={handleGoogleLogin}
-              disabled={isGoogleLoading || isProcessing}
-            >
-              {isGoogleLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5 absolute left-4" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66 2.84z" fill="#FBBC05" />
-                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-                  </svg>
-                  <span>Sign up with Google</span>
-                </>
-              )}
-            </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4 h-12 rounded-xl border-muted-foreground/20 hover:bg-muted/50 transition-all group overflow-hidden relative"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading || isProcessing}
+                >
+                  {isGoogleLoading ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <svg className="mr-3 h-5 w-5 transition-transform group-hover:scale-110 duration-300" viewBox="0 0 24 24">
+                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                  )}
+                  <span className="font-semibold">{isGoogleLoading ? 'Connecting...' : 'Sign up with Google'}</span>
+                </Button>
+              </>
+            )}
 
-            <div className="text-center text-sm mt-4">
-              <span className="text-muted-foreground">Already have an account? </span>
+            <div className="text-center text-sm mt-8">
+              <span className="text-muted-foreground font-medium">Already have an account? </span>
               <button
                 type="button"
-                className="text-primary hover:underline font-medium"
+                className="text-primary hover:underline font-bold transition-all"
                 onClick={() => navigate({ to: '/signin' })}
               >
                 Sign In
               </button>
             </div>
+            
+            <p className="text-[10px] text-center text-muted-foreground mt-6 px-6 leading-relaxed">
+              By continuing, you agree to our Terms of Service and Privacy Policy. Securely managed by MedicalCare Health Systems.
+            </p>
           </CardContent>
         </Card>
       </div>

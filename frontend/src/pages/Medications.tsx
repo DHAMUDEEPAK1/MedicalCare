@@ -84,11 +84,80 @@ export default function Medications() {
     localStorage.setItem('userMedications', JSON.stringify(medications));
   }, [medications]);
 
+  // Global Reminder System
   useEffect(() => {
-    // Listen for storage changes from other tabs/pages
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'userMedications' && e.newValue) {
-        setMedications(JSON.parse(e.newValue));
+    const playNotificationSound = () => {
+      try {
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+        gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1);
+
+        // Second beep
+        setTimeout(() => {
+          const osc2 = audioCtx.createOscillator();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5
+          osc2.connect(gainNode);
+          osc2.start();
+          osc2.stop(audioCtx.currentTime + 0.2);
+        }, 150);
+      } catch (e) {
+        console.error("Audio reminder failed:", e);
+      }
+    };
+
+    const checkReminders = () => {
+      const now = new Date();
+      const currentHours = now.getHours().toString().padStart(2, '0');
+      const currentMinutes = now.getMinutes().toString().padStart(2, '0');
+      const currentTimeStr = `${currentHours}:${currentMinutes}`;
+
+      const dueMeds = medications.filter(med => med.time === currentTimeStr && !med.taken);
+
+      if (dueMeds.length > 0) {
+        console.log(`[Goku] 💊 Reminder for: ${dueMeds.map(m => m.name).join(', ')}`);
+        playNotificationSound();
+        // Optional: Show a browser notification if permitted
+        if (Notification.permission === "granted") {
+          new Notification("Medication Reminder", {
+            body: `It's time to take: ${dueMeds.map(m => m.name).join(', ')}`,
+            icon: "/pwa-192x192.png"
+          });
+        }
+      }
+    };
+
+    // Check every minute
+    const interval = setInterval(checkReminders, 60000);
+    // Also check once immediately
+    checkReminders();
+
+    return () => clearInterval(interval);
+  }, [medications]);
+
+  useEffect(() => {
+    // Listen for storage changes from other tabs/pages OR manual dispatches from AI Assistant
+    const handleStorage = (e: Event) => {
+      if ((e as StorageEvent).key) {
+        if ((e as StorageEvent).key === 'userMedications' && (e as StorageEvent).newValue) {
+          setMedications(JSON.parse((e as StorageEvent).newValue!));
+        }
+      } else {
+        // Manual event: Refresh from local storage
+        const saved = localStorage.getItem('userMedications');
+        if (saved) {
+          setMedications(JSON.parse(saved));
+        }
       }
     };
     window.addEventListener('storage', handleStorage);

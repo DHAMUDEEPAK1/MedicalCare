@@ -4,7 +4,8 @@ import { useRequireAuth } from '../hooks/useRequireAuth';
 import { useMedicalFiles } from '../hooks/useMedicalFiles';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Upload, Trash2, FileText, Search, ShieldCheck } from 'lucide-react';
+import { Loader2, Upload, Trash2, FileText, Search, ShieldCheck, ScanLine, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { validateMedicalDocument, type ValidationResult } from '../utils/medicalDocValidator';
 import { toast } from 'sonner';
 import { DesignBSurface } from '../designB/components/DesignBSurface';
 import { PageTitle, BodyText } from '../designB/components/DesignBTypography';
@@ -19,6 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export default function Report() {
   useRequireAuth();
@@ -30,6 +37,10 @@ export default function Report() {
   const [searchQuery, setSearchQuery] = useState('');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [viewDocumentReq, setViewDocumentReq] = useState<{url: string, type: string, name: string} | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<ValidationResult | null>(null);
+  const [rejectedFile, setRejectedFile] = useState<{name: string, reason: string} | null>(null);
 
   const { files, isLoading, uploadFile, deleteFile, downloadFile } = useMedicalFiles();
 
@@ -41,6 +52,8 @@ export default function Report() {
     const file = e.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      setScanResult(null);
+      setRejectedFile(null);
       if (file.type.startsWith('image/') || file.type === 'application/pdf') {
         const url = URL.createObjectURL(file);
         setPreviewUrl(url);
@@ -50,12 +63,34 @@ export default function Report() {
     }
   };
 
-  const handleUpload = async () => {
+  const handleUpload = async (forceUpload = false) => {
     if (!selectedFile) {
       toast.error('Please select a file to upload');
       return;
     }
 
+    // --- STEP 1: AI Medical Document Validation ---
+    if (!forceUpload) {
+      setIsScanning(true);
+      setScanResult(null);
+      try {
+        const result = await validateMedicalDocument(selectedFile);
+        setScanResult(result);
+        setIsScanning(false);
+
+        if (!result.is_medical) {
+          setRejectedFile({ name: selectedFile.name, reason: result.reason });
+          toast.error('Document rejected — does not appear to be a medical file.');
+          return; // Block the upload
+        }
+      } catch {
+        setIsScanning(false);
+        toast.error('AI scan failed. Please try again.');
+        return;
+      }
+    }
+
+    // --- STEP 2: Proceed with actual upload ---
     try {
       await uploadFile(selectedFile);
       const isPrescription = uploadType === 'prescription';
@@ -64,6 +99,8 @@ export default function Report() {
       const fileName = selectedFile.name;
       setSelectedFile(null);
       setPreviewUrl(null);
+      setScanResult(null);
+      setRejectedFile(null);
       const fileInput = document.getElementById('file-input') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
 
@@ -84,11 +121,15 @@ export default function Report() {
       setIsPreviewing(true);
       const bytes = await downloadFile(fileId, filename, true);
       if (bytes) {
-        // Fix for the TypeScript error: type casting to any to bypass the BlobPart check if it fails
-        const blob = new Blob([bytes as any], { type: 'application/pdf' });
+        let type = 'application/octet-stream';
+        const lowerName = filename.toLowerCase();
+        if (lowerName.endsWith('.pdf')) type = 'application/pdf';
+        else if (lowerName.endsWith('.png')) type = 'image/png';
+        else if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) type = 'image/jpeg';
+
+        const blob = new Blob([bytes as any], { type });
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setViewDocumentReq({url, type, name: filename});
       }
     } catch (error) {
       toast.error('Could not open preview');
@@ -178,27 +219,92 @@ export default function Report() {
               accept="application/pdf,image/*"
             />
             <div className="space-y-4">
-              <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto group-hover:scale-110 transition-transform">
-                <Upload className="h-8 w-8 text-primary" />
+              <div className={`h-16 w-16 rounded-full flex items-center justify-center mx-auto transition-all ${
+                isScanning ? 'bg-amber-500/20 animate-pulse' :
+                scanResult?.is_medical ? 'bg-green-500/20' :
+                rejectedFile ? 'bg-red-500/20' :
+                'bg-primary/10 group-hover:scale-110'
+              }`}>
+                {isScanning ? (
+                  <ScanLine className="h-8 w-8 text-amber-500 animate-pulse" />
+                ) : scanResult?.is_medical ? (
+                  <CheckCircle2 className="h-8 w-8 text-green-500" />
+                ) : rejectedFile ? (
+                  <AlertTriangle className="h-8 w-8 text-red-500" />
+                ) : (
+                  <Upload className="h-8 w-8 text-primary" />
+                )}
               </div>
               <div>
                 <p className="font-bold text-lg">
-                  {selectedFile ? selectedFile.name : 'Choose a file or drag & drop'}
+                  {isScanning ? 'Scanning document locally (Private AI)...' :
+                   rejectedFile ? `Rejected: ${rejectedFile.name}` :
+                   selectedFile ? selectedFile.name :
+                   'Choose a file or drag & drop'}
                 </p>
-                <p className="text-sm text-muted-foreground">PDF, JPEG, or PNG up to 10MB</p>
+                {isScanning ? (
+                  <p className="text-sm text-amber-600 dark:text-amber-400 font-medium animate-pulse">
+                    Verified offline — No data sent to external AI servers.
+                  </p>
+                ) : scanResult?.is_medical ? (
+                  <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+                    ✓ Verified: {scanResult.document_type} ({Math.round(scanResult.confidence_score * 100)}% confidence)
+                  </p>
+                ) : rejectedFile ? (
+                  <p className="text-sm text-red-500 font-medium">
+                    {rejectedFile.reason}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">PDF, JPEG, or PNG up to 10MB</p>
+                )}
               </div>
-              {selectedFile && (
-                <Button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleUpload();
-                  }}
-                  disabled={isLoading}
-                  className="w-full md:w-auto px-12 h-12 rounded-xl text-md font-bold shadow-lg shadow-primary/20"
-                >
-                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Upload className="h-5 w-5 mr-2" />}
-                  Confirm & Upload
-                </Button>
+              {selectedFile && !isScanning && (
+                <div className="flex items-center gap-3 justify-center flex-wrap">
+                  {!rejectedFile ? (
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpload();
+                      }}
+                      disabled={isLoading || isScanning}
+                      className="px-12 h-12 rounded-xl text-md font-bold shadow-lg shadow-primary/20"
+                    >
+                      {isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Upload className="h-5 w-5 mr-2" />}
+                      Confirm & Upload
+                    </Button>
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted-foreground w-full text-center">Think the AI made a mistake?</p>
+                      <Button
+                        variant="outline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRejectedFile(null);
+                          setScanResult(null);
+                          handleUpload(true); // Force upload
+                        }}
+                        className="h-10 rounded-xl text-sm border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                      >
+                        Upload Anyway
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedFile(null);
+                          setPreviewUrl(null);
+                          setScanResult(null);
+                          setRejectedFile(null);
+                          const fi = document.getElementById('file-input') as HTMLInputElement;
+                          if (fi) fi.value = '';
+                        }}
+                        className="h-10 rounded-xl text-sm text-destructive"
+                      >
+                        Remove File
+                      </Button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -213,12 +319,26 @@ export default function Report() {
                 }}>Remove</Button>
               </div>
               {selectedFile?.type === 'application/pdf' ? (
-                <div className="p-12 text-center">
+                <div 
+                  className="p-12 text-center cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                  onClick={() => setViewDocumentReq({ url: previewUrl, type: 'application/pdf', name: selectedFile.name })}
+                >
                   <FileText className="h-12 w-12 mx-auto mb-2 text-primary/40" />
-                  <p className="text-sm text-muted-foreground">PDF Document Ready</p>
+                  <p className="text-sm text-foreground/80 font-semibold">Click to Preview PDF</p>
+                  <p className="text-xs text-muted-foreground mt-1">Ready for Upload</p>
                 </div>
               ) : (
-                <img src={previewUrl} alt="Preview" className="max-h-64 mx-auto object-contain" />
+                <div 
+                  className="cursor-pointer group relative"
+                  onClick={() => setViewDocumentReq({ url: previewUrl, type: selectedFile.type, name: selectedFile.name })}
+                >
+                  <img src={previewUrl} alt="Preview" className="max-h-64 mx-auto object-contain transition-opacity group-hover:opacity-80" />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <span className="bg-black/80 text-white px-3 py-1.5 rounded-lg text-sm font-semibold shadow-xl">
+                      Click to Enlarge
+                    </span>
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -307,6 +427,48 @@ export default function Report() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog 
+        open={!!viewDocumentReq} 
+        onOpenChange={(open) => {
+          if (!open && viewDocumentReq) {
+            URL.revokeObjectURL(viewDocumentReq.url);
+            setViewDocumentReq(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-background">
+          <DialogHeader className="p-4 border-b shrink-0 bg-muted/30">
+            <DialogTitle className="truncate pr-8">{viewDocumentReq?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto bg-black/5 dark:bg-black/40 flex items-center justify-center p-4">
+            {viewDocumentReq?.type.includes('pdf') ? (
+              <object 
+                data={viewDocumentReq.url} 
+                type="application/pdf" 
+                className="w-full h-full min-h-[60vh] rounded-xl shadow-lg"
+              >
+                <div className="flex flex-col flex-1 items-center justify-center text-center p-8">
+                  <FileText className="h-16 w-16 mb-4 text-muted-foreground" />
+                  <p className="text-lg font-semibold text-foreground">Cannot preview PDF natively</p>
+                  <p className="text-muted-foreground mb-4">Your browser/device may not support embedded PDFs.</p>
+                  <Button asChild>
+                    <a href={viewDocumentReq.url} target="_blank" rel="noopener noreferrer">
+                      Open PDF externally
+                    </a>
+                  </Button>
+                </div>
+              </object>
+            ) : (
+              <img 
+                src={viewDocumentReq?.url} 
+                alt="Document Preview" 
+                className="max-w-full max-h-full object-contain rounded-xl shadow-lg border border-border/50" 
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

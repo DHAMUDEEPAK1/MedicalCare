@@ -1,4 +1,42 @@
-// Local deterministic text extraction from report files
+const PDFJS_VERSION = '3.4.120';
+const WORKER_CDN = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.js`;
+const CMAP_URL = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/cmaps/`;
+
+let pdfjsLib: any = null;
+
+async function getPdfjs() {
+  if (pdfjsLib) return pdfjsLib;
+  
+  try {
+    // 1. Primary: Use bundled pdfjs-dist (Works on Web & APK)
+    pdfjsLib = await import('pdfjs-dist');
+    
+    if (pdfjsLib.GlobalWorkerOptions) {
+      try {
+        // @ts-ignore - Dynamic worker entry for bundling
+        const worker = await import('pdfjs-dist/build/pdf.worker.entry');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = worker;
+      } catch (workerError) {
+        console.warn("[Goku PDF] Local worker failed, using CDN.", workerError);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_CDN;
+      }
+    }
+  } catch (e) {
+    console.warn("[Goku PDF] Bundled import failed, falling back to CDN ESM...", e);
+    try {
+      // 2. Secondary: Fallback to direct CDN for legacy environments
+      pdfjsLib = await import(/* @vite-ignore */ `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/+esm`);
+      if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_CDN;
+      }
+    } catch (cdnError) {
+      console.error("[Goku PDF] CRITICAL: PDF engine unavailable.", cdnError);
+      throw new Error("Unable to initialize PDF clinical scanner.");
+    }
+  }
+  
+  return pdfjsLib;
+}
 
 export interface TextExtractionResult {
   success: boolean;
@@ -7,40 +45,57 @@ export interface TextExtractionResult {
 }
 
 /**
- * Attempts to extract text from file bytes.
- * Only works for plain text-like formats.
+ * Extracts text from a PDF file using the clinical PDFjs engine.
+ */
+export async function extractTextFromPDF(file: File): Promise<string> {
+  try {
+    const pdfjs = await getPdfjs();
+    
+    const loadingTask = pdfjs.getDocument({
+      url: URL.createObjectURL(file),
+      cMapUrl: CMAP_URL,
+      cMapPacked: true
+    });
+    
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items
+        .map((item: any) => (item as any).str)
+        .join(' ');
+      fullText += pageText + '\n\n';
+    }
+    
+    return fullText;
+  } catch (error) {
+    console.error('PDF text extraction failed:', error);
+    throw new Error('PDF parsing failed. Please ensure the document is not password-protected.');
+  }
+}
+
+/**
+ * Core text extraction from binary bytes.
  */
 export async function extractTextFromBytes(
-  bytes: Uint8Array,
-  filename: string,
-  contentType?: string
+  bytes: Uint8Array
 ): Promise<TextExtractionResult> {
   try {
-    // Check if it's likely a text-based format
-    const isTextFormat = isLikelyTextFile(filename, contentType);
-    
-    if (!isTextFormat) {
-      return {
-        success: false,
-        error: 'binary-format',
-      };
-    }
-
-    // Try to decode as UTF-8
     const decoder = new TextDecoder('utf-8', { fatal: false });
     const text = decoder.decode(bytes);
 
-    // Check if the decoded text looks reasonable (not binary garbage)
-    if (!isValidText(text)) {
+    if (isValidText(text)) {
       return {
-        success: false,
-        error: 'invalid-text',
+        success: true,
+        text: text.trim(),
       };
     }
 
     return {
-      success: true,
-      text: text.trim(),
+      success: false,
+      error: 'invalid-text',
     };
   } catch (error) {
     console.error('Text extraction error:', error);
@@ -51,44 +106,22 @@ export async function extractTextFromBytes(
   }
 }
 
-function isLikelyTextFile(filename: string, contentType?: string): boolean {
-  const textExtensions = ['.txt', '.text', '.log', '.csv', '.json', '.xml', '.html', '.md'];
-  const textContentTypes = ['text/', 'application/json', 'application/xml'];
+/**
+ * Validates if the string is likely printable clinical text.
+ */
+export function isValidText(text: string): boolean {
+  if (!text || text.length === 0) return false;
 
-  // Check file extension
-  const lowerFilename = filename.toLowerCase();
-  if (textExtensions.some(ext => lowerFilename.endsWith(ext))) {
-    return true;
-  }
-
-  // Check content type
-  if (contentType) {
-    const lowerContentType = contentType.toLowerCase();
-    if (textContentTypes.some(type => lowerContentType.startsWith(type))) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-function isValidText(text: string): boolean {
-  if (!text || text.length === 0) {
-    return false;
-  }
-
-  // Check for excessive binary/control characters
   let controlCharCount = 0;
   const sampleSize = Math.min(text.length, 1000);
-  
+
   for (let i = 0; i < sampleSize; i++) {
     const code = text.charCodeAt(i);
-    // Count non-printable characters (excluding common whitespace)
     if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
       controlCharCount++;
     }
   }
 
-  // If more than 10% are control characters, likely binary
   const controlRatio = controlCharCount / sampleSize;
   return controlRatio < 0.1;
+}

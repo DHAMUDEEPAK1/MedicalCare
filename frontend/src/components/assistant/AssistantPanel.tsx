@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Mic, Send, Trash2, Loader2, Sparkles, X, Volume2, VolumeX, StopCircle } from 'lucide-react';
+import { Mic, Send, Trash2, Loader2, Sparkles, X, Volume2, VolumeX, StopCircle, FileText } from 'lucide-react';
 import { AssistantMessage, AssistantStatus } from './assistantTypes';
 import { useSpeechRecognition } from './useSpeechRecognition';
 import { useSpeechSynthesis } from './useSpeechSynthesis';
@@ -25,6 +25,7 @@ interface AssistantPanelProps {
   onInputChange: (value: string) => void;
   onVoiceInput: (text: string) => void;
   onClearConversation: () => void;
+  onFileUpload: (file: File) => void;
   showHeader?: boolean;
   autoStartVoice?: boolean;
   externalSpeech?: any;
@@ -39,6 +40,7 @@ export function AssistantPanel({
   onInputChange,
   onVoiceInput,
   onClearConversation,
+  onFileUpload,
   showHeader = true,
   autoStartVoice = false,
   externalSpeech,
@@ -64,6 +66,15 @@ export function AssistantPanel({
 
   const [isWaking, setIsWaking] = useState(false);
   const [isVoiceModeOpen, setIsVoiceModeOpen] = useState(false);
+
+  // Log TTS initialization status
+  useEffect(() => {
+    if (tts.hasCustomVoice) {
+      console.log('[Goku] Custom voice ready for use');
+    } else {
+      console.log('[Goku] Using system TTS as fallback');
+    }
+  }, [tts.hasCustomVoice]);
 
   // Auto-scroll logic
   useEffect(() => {
@@ -97,23 +108,36 @@ export function AssistantPanel({
     speakFnRef.current = tts.speak;
   }, [tts.speak]);
 
-  // Speak assistant responses
+  // Speak assistant responses with echo protection
   useEffect(() => {
     if (transcript.length > 0) {
       const lastMessage = transcript[transcript.length - 1];
       if (lastMessage.role === 'assistant' && lastMessage.id !== lastSpokenMessageId.current) {
         lastSpokenMessageId.current = lastMessage.id;
 
-        // Use the current ref to avoid effect re-trigger cycles
+        // Echo Protection: Stop listening before speaking
+        const wasListening = speech.isListening;
+        if (wasListening) {
+          speech.stop();
+        }
+
+        // Delay slightly to ensure mic is fully off
         setTimeout(() => {
-          // Detect which language to speak back in
-          // For now we pass ai.currentLanguage, but in a smarter version 
-          // we could store the detected language per message
-          speakFnRef.current(lastMessage.content, ai.currentLanguage);
-        }, 100);
+          tts.speak(lastMessage.content, ai.currentLanguage);
+
+          // If we were in continuous listening mode, we might want to restart after speaking
+          // But for now, let's keep it manual or wait for the 'onend' event if we had a callback
+        }, 300);
       }
     }
-  }, [transcript, ai.currentLanguage]);
+  }, [transcript, ai.currentLanguage, speech, tts]);
+
+  // Restart listening after speech ends (Optional, but helps with hands-free)
+  useEffect(() => {
+    if (!tts.isSpeaking && !speech.isListening && lastSpokenMessageId.current) {
+      // Optional: speech.start(); // Auto-restart after Goku finishes talking
+    }
+  }, [tts.isSpeaking, speech]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -300,15 +324,36 @@ export function AssistantPanel({
               </Button>
             )}
 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full h-10 w-10 flex-shrink-0 text-muted-foreground hover:bg-primary/10"
+              onClick={() => document.getElementById('report-upload')?.click()}
+              title="Upload Report"
+            >
+              <FileText className="h-5 w-5" />
+              <span className="sr-only">Upload Report</span>
+            </Button>
 
+            <input
+              id="report-upload"
+              type="file"
+              className="hidden"
+              accept=".pdf,.png,.jpg,.jpeg,.txt"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onFileUpload(file);
+                e.target.value = ""; // Reset
+              }}
+            />
 
             <Button
               size="icon"
               className="rounded-full h-10 w-10 flex-shrink-0 mr-1"
               onClick={() => onVoiceInput(inputValue)}
-              disabled={!inputValue.trim() || ai.status === 'processing'}
+              disabled={!inputValue.trim() || status === 'processing'}
             >
-              {ai.status === 'processing' ? (
+              {status === 'processing' ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
@@ -316,7 +361,11 @@ export function AssistantPanel({
             </Button>
           </div>
 
-          <div className="flex justify-center">
+          <div className="text-xs text-muted-foreground mt-1 px-4 text-center">
+            Tip: For best results, upload PDF reports or copy/paste text
+          </div>
+
+          <div className="flex justify-center mt-2">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold opacity-50">
               Powered by Goku Intelligence
             </p>

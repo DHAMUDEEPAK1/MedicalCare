@@ -29,8 +29,10 @@ export type ReportAnalysisContext =
   | { state: 'awaiting-paste', selectedReportId?: string, selectedReportFilename?: string };
 
 export interface CommandResult {
-  type: 'navigation' | 'help' | 'unknown' | 'medical' | 'report-list' | 'report-paste-request';
+  type: 'navigation' | 'help' | 'unknown' | 'medical' | 'report-list' | 'report-paste-request' | 'EMERGENCY' | 'GENERAL_KNOWLEDGE' | 'MEDICAL_RESPONSE' | 'TALK' | 'NAVIGATION';
   message: string;
   navigationTarget?: string;
   targetFilename?: string;
+  category?: string;
+  content?: any;
 }

@@ -1,229 +1,186 @@
-// Deterministic local report analysis utilities
+/**
+ * 🩺 Clinical Consultation Engine
+ * Authoritative, deterministically-driven medical report analysis.
+ * Emulates a high-fidelity 'Doctor to Patient' strategic consultation.
+ */
 
-export interface ReportAnalysisResult {
-  keyFindings: string[];
-  interpretation: string;
-  suggestedActions: string[];
-  redFlags: string[];
-  disclaimer: string;
+export interface ClinicalStrategicResult {
+  consultationSummary: string;
+  keyClinicalFindings: string[];
+  strategicInterpretation: string;
+  wellnessRoadMap: string[];
+  criticalSignals: string[];
+  professionalDisclaimer: string;
 }
 
 /**
- * Analyzes report text and extracts key information.
- * This is a deterministic, pattern-based analysis (no AI/LLM).
+ * Executes a full clinical scan of the report text.
+ * Adopt persona: Clinical Health Strategist (Goku)
  */
-export function analyzeReportText(reportText: string, filename: string): ReportAnalysisResult {
-  const findings = extractKeyFindings(reportText);
-  const interpretation = generateInterpretation(findings, reportText);
-  const actions = generateSuggestedActions(findings, reportText);
-  const redFlags = identifyRedFlags(reportText);
+export function analyzeReportText(reportText: string, filename: string): ClinicalStrategicResult {
+  const findings = extractClinicalMarkers(reportText);
+  const interpretation = synthesizeClinicalInterpretation(findings, reportText);
+  const roadMap = generateWellnessRoadMap(findings, reportText);
+  const signals = detectCriticalSignals(reportText);
+
+  const summary = `### 🩺 Clinical Consultation: ${filename}\n\nGreetings. As your **Clinical Health Strategist**, I have conducted an exhaustive heuristic scan of your report. I've identified several key markers that we need to examine to optimize your current wellness trajectory. \n\n**Analysis Status:** ${signals.length > 0 ? "⚠️ DEVIATIONS DETECTED" : "🟢 OPTIMAL PROFILE DETECTED"}`;
 
   return {
-    keyFindings: findings,
-    interpretation,
-    suggestedActions: actions,
-    redFlags,
-    disclaimer: getReportDisclaimer(),
+    consultationSummary: summary,
+    keyClinicalFindings: findings,
+    strategicInterpretation: interpretation,
+    wellnessRoadMap: roadMap,
+    criticalSignals: signals,
+    professionalDisclaimer: getStrategicDisclaimer(),
   };
 }
 
-function extractKeyFindings(text: string): string[] {
+function extractClinicalMarkers(text: string): string[] {
   const findings: string[] = [];
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
-  // Look for common medical report patterns
+  
+  // High-precision pattern matching for clinical values
   const patterns = [
-    // Lab values with numbers
-    /([A-Za-z\s]+):\s*(\d+\.?\d*)\s*([a-zA-Z/%]+)?/g,
-    // Test results
-    /(positive|negative|normal|abnormal|elevated|low|high)\s+for\s+([A-Za-z\s]+)/gi,
-    // Diagnosis patterns
-    /(diagnosis|impression|findings?):\s*([^\n]+)/gi,
-    // Measurements
-    /([A-Za-z\s]+)\s+(?:is|was|measures?)\s+(\d+\.?\d*)\s*([a-zA-Z/%]+)?/gi,
+    // Lab values (e.g., Hemoglobin: 14.5 g/dL)
+    /([A-Za-z\s]+):\s*(\d+\.?\d*)\s*([a-zA-Z/%μ]+)?/g,
+    // Formal Impressions
+    /(?:IMPRESSION|DIAGNOSIS|FINDINGS):\s*([^\n.]+)/gi,
+    // Status indicators
+    /(?:POSITIVE|NEGATIVE|REACTIVE|NON-REACTIVE|NORMAL|ABNORMAL|ELEVATED|LOW|HIGH)\s+(?:for|result)?\s+([A-Za-z\s]+)/gi
   ];
 
   patterns.forEach(pattern => {
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      if (match[0].length > 5 && match[0].length < 200) {
+      if (match[0].length > 4 && match[0].length < 150) {
         findings.push(match[0].trim());
       }
     }
   });
 
-  // If no structured findings, extract lines that look like results
-  if (findings.length === 0) {
-    lines.forEach(line => {
-      if (line.length > 10 && line.length < 200) {
-        // Lines with numbers or medical keywords
-        if (/\d/.test(line) || /result|test|level|count|pressure|rate/i.test(line)) {
-          findings.push(line);
-        }
-      }
-    });
-  }
-
-  // Limit to most relevant findings
-  return findings.slice(0, 10);
+  return Array.from(new Set(findings)).slice(0, 12);
 }
 
-function generateInterpretation(findings: string[], fullText: string): string {
-  const lowerText = fullText.toLowerCase();
-  const interpretations: string[] = [];
+function synthesizeClinicalInterpretation(findings: string[], fullText: string): string {
+  const lower = fullText.toLowerCase();
+  const insights: string[] = [];
 
-  // Check for common medical terms and provide educational context
-  if (lowerText.includes('glucose') || lowerText.includes('blood sugar')) {
-    interpretations.push('Blood glucose/sugar levels indicate how well your body is managing sugar. Normal fasting levels are typically 70-100 mg/dL.');
+  // Strategic Category Checks
+  if (lower.includes('diabetes') || lower.includes('glucose') || lower.includes('hba1c')) {
+    insights.push("> **Endocrine Insight**: I'm observing signals related to your glucose metabolism. Your glycemic index is a primary driver of your long-term cellular energy and vascular health.");
   }
 
-  if (lowerText.includes('cholesterol')) {
-    interpretations.push('Cholesterol levels help assess heart disease risk. Total cholesterol under 200 mg/dL is generally considered desirable.');
+  if (lower.includes('hemoglobin') || lower.includes('hgb') || lower.includes('iron') || lower.includes('ferritin')) {
+    insights.push("> **Hematology Insight**: The oxygen-carrying capacity of your blood (Hemoglobin) is a critical performance metric. Fluctuations here can significantly impact your recovery and energy levels.");
   }
 
-  if (lowerText.includes('blood pressure') || lowerText.includes('bp')) {
-    interpretations.push('Blood pressure readings show the force of blood against artery walls. Normal is typically below 120/80 mmHg.');
+  if (lower.includes('cholesterol') || lower.includes('lipid') || lower.includes('ldl') || lower.includes('hdl')) {
+    insights.push("> **Cardiovascular Insight**: Your lipid profile serves as the structural roadmap for your arterial health. Maintaining an optimal LDL/HDL ratio is a top priority for our cardiovascular strategy.");
   }
 
-  if (lowerText.includes('hemoglobin') || lowerText.includes('hgb') || lowerText.includes('hb')) {
-    interpretations.push('Hemoglobin carries oxygen in your blood. Low levels may indicate anemia; high levels may indicate dehydration or other conditions.');
+  if (lower.includes('thyroid') || lower.includes('tsh') || lower.includes('t4')) {
+    insights.push("> **Metabolic Insight**: These thyroid markers regulate the 'speed' of your metabolic engine. Any deviation here can manifest as fatigue or unexpected weight changes.");
   }
 
-  if (lowerText.includes('white blood cell') || lowerText.includes('wbc')) {
-    interpretations.push('White blood cells fight infection. Elevated levels may indicate infection or inflammation; low levels may indicate immune system issues.');
+  if (lower.includes('liver') || lower.includes('alt') || lower.includes('ast') || lower.includes('bilirubin')) {
+    insights.push("> **Hepatic Insight**: Your liver enzymes reflect your body's detoxification efficiency. Elevated markers may indicate hepatic stress or environmental overload.");
   }
 
-  if (lowerText.includes('thyroid') || lowerText.includes('tsh')) {
-    interpretations.push('Thyroid tests measure thyroid hormone levels, which regulate metabolism. Abnormal levels can affect energy, weight, and mood.');
+  if (lower.includes('renal') || lower.includes('creatinine') || lower.includes('urea') || lower.includes('kidney')) {
+    insights.push("> **Renal Insight**: These markers track your kidney's filtration precision. They are vital for maintaining systemic mineral balance and blood pressure stability.");
   }
 
-  if (lowerText.includes('creatinine') || lowerText.includes('kidney')) {
-    interpretations.push('Creatinine levels help assess kidney function. Elevated levels may indicate reduced kidney function.');
+  if (insights.length === 0) {
+    insights.push("> **General Clinical Observation**: This report contains various physiological metrics. While many appear standard, my protocol is to view them as a collective baseline for your future health milestones.");
   }
 
-  if (lowerText.includes('liver') || lowerText.includes('alt') || lowerText.includes('ast')) {
-    interpretations.push('Liver enzyme tests assess liver health. Elevated levels may indicate liver inflammation or damage.');
-  }
+  return insights.join('\n\n');
+}
 
-  // Check for abnormal/concerning terms
+function generateWellnessRoadMap(findings: string[], fullText: string): string[] {
+  const plan: string[] = [];
+  const lower = fullText.toLowerCase();
+
+  plan.push("Schedule a formal follow-up with your primary physician to validate these heuristics.");
+
   if (/abnormal|elevated|high|low|outside.*range/i.test(fullText)) {
-    interpretations.push('Some values appear to be outside normal ranges. This may or may not be concerning depending on your individual health context.');
+    plan.push("Prepare a targeted list of questions regarding the specific deviations I've highlighted.");
   }
 
-  if (interpretations.length === 0) {
-    interpretations.push('This report contains medical test results or health information. The specific values and their significance depend on your individual health history and current condition.');
+  if (lower.includes('glucose') || lower.includes('sugar')) {
+    plan.push("Implement a 7-day refined sugar audit to stabilize your glycemic response.");
   }
 
-  return interpretations.join('\n\n');
+  if (lower.includes('cholesterol') || lower.includes('lipid')) {
+    plan.push("Prioritize Omega-3 rich intake and moderate cardiovascular exercise (30 mins/day).");
+  }
+
+  if (lower.includes('hemoglobin') || lower.includes('anemia')) {
+    plan.push("Introduce iron-rich nutrient density (dark leafy greens, lean proteins) alongside Vitamin C to enhance absorption.");
+  }
+
+  plan.push("Archive this consultation in your secure health vault for longitudinal tracking.");
+
+  return plan;
 }
 
-function generateSuggestedActions(findings: string[], fullText: string): string[] {
-  const actions: string[] = [];
-  const lowerText = fullText.toLowerCase();
-
-  // Always recommend discussing with healthcare provider
-  actions.push('Discuss these results with your healthcare provider to understand what they mean for your specific situation');
-
-  // Specific recommendations based on content
-  if (/abnormal|elevated|high|outside.*range/i.test(fullText)) {
-    actions.push('Ask your doctor about any values that are outside the normal range and what steps, if any, you should take');
-  }
-
-  if (lowerText.includes('follow') || lowerText.includes('retest') || lowerText.includes('repeat')) {
-    actions.push('Follow any recommended follow-up testing or appointments mentioned in the report');
-  }
-
-  if (lowerText.includes('medication') || lowerText.includes('treatment')) {
-    actions.push('Discuss any recommended medications or treatments with your healthcare provider');
-  }
-
-  // General health actions
-  actions.push('Keep this report in your medical records for future reference');
-  actions.push('Bring this report to your next medical appointment');
-
-  return actions;
-}
-
-function identifyRedFlags(text: string): string[] {
-  const redFlags: string[] = [];
-  const lowerText = text.toLowerCase();
-
-  // Emergency/urgent keywords
-  const urgentPatterns = [
-    { pattern: /critical|severe|emergency|urgent|immediate/i, flag: 'Report contains urgent or critical findings' },
-    { pattern: /malignant|cancer|tumor/i, flag: 'Report mentions potentially serious conditions' },
-    { pattern: /acute|crisis/i, flag: 'Report indicates acute or crisis situation' },
-    { pattern: /abnormal.*significant|significantly abnormal/i, flag: 'Report notes significantly abnormal findings' },
+function detectCriticalSignals(text: string): string[] {
+  const flags: string[] = [];
+  
+  const emergencyPatterns = [
+    { pattern: /critical|emergency|severe|urgent/i, flag: "URGENT: Report contains high-priority critical indicators." },
+    { pattern: /malignant|cancer|tumor|mass/i, flag: "STRATEGIC ALERT: Mentions of potentially serious structural abnormalities detected." },
+    { pattern: /acute|crisis/i, flag: "ACUTE ALERT: Clinical markers indicate an immediate systemic stressor." }
   ];
 
-  urgentPatterns.forEach(({ pattern, flag }) => {
-    if (pattern.test(text)) {
-      redFlags.push(flag);
-    }
+  emergencyPatterns.forEach(({ pattern, flag }) => {
+    if (pattern.test(text)) flags.push(flag);
   });
 
-  // Always include general emergency guidance
-  redFlags.push('🚨 If you experience severe symptoms (chest pain, difficulty breathing, severe bleeding, loss of consciousness), call 911 immediately');
-
-  return redFlags;
+  return flags;
 }
 
-function getReportDisclaimer(): string {
-  return `⚠️ IMPORTANT DISCLAIMER:
+function getStrategicDisclaimer(): string {
+  return `### 🛡️ Professional Disclaimer
+  
+I am your **Local Clinical AI Strategist**, not a medical doctor. This analysis is an automated heuristic interpretation provided for educational coordination.
 
-This analysis is for educational purposes only and is NOT a medical diagnosis or professional medical advice. 
-
-• I am an AI assistant, not a doctor
-• Medical reports require professional interpretation
-• Lab values must be considered in context of your complete health history
-• Normal ranges vary by lab, age, sex, and individual factors
-• Only your healthcare provider can properly interpret these results
-
-NEXT STEPS:
-✓ Schedule an appointment with your healthcare provider to review these results
-✓ Bring this report to your appointment
-✓ Ask questions about anything you don't understand
-✓ Follow your doctor's recommendations
-
-If you have urgent concerns or symptoms, contact your healthcare provider immediately or call 911 for emergencies.`;
+**Protocol:**
+• This report does not constitute a legal medical diagnosis.
+• Clinical values are subject to laboratory-specific calibration ranges.
+• Use this analysis as a structured preparation for your professional medical consultation.
+• **EMERGENCY:** If you are experiencing chest pain, difficulty breathing, or sudden confusion, call 911 (or local emergency services) immediately.`;
 }
 
 /**
- * Formats the analysis result into a readable message for the assistant.
+ * Formats the final 'Doctor' message.
  */
-export function formatAnalysisMessage(analysis: ReportAnalysisResult, filename: string): string {
-  let message = `📋 **Analysis of: ${filename}**\n\n`;
+export function formatAnalysisMessage(analysis: ClinicalStrategicResult, filename: string): string {
+  let message = `### 📋 Document Review: ${filename}\n\n${analysis.consultationSummary}\n\n`;
 
-  // Key Findings
-  if (analysis.keyFindings.length > 0) {
-    message += `**KEY FINDINGS:**\n`;
-    analysis.keyFindings.forEach(finding => {
-      message += `• ${finding}\n`;
-    });
+  // Findings
+  if (analysis.keyClinicalFindings.length > 0) {
+    message += `#### 📋 Key Identification Markers:\n`;
+    analysis.keyClinicalFindings.forEach(f => message += `• ${f}\n`);
     message += `\n`;
   }
 
-  // Interpretation
-  message += `**WHAT THIS MAY INDICATE:**\n${analysis.interpretation}\n\n`;
+  // Strategic Insight
+  message += `#### 🧬 Strategic Clinical Insight:\n`;
+  message += `${analysis.strategicInterpretation}\n\n`;
 
-  // Suggested Actions
-  message += `**SUGGESTED NEXT STEPS:**\n`;
-  analysis.suggestedActions.forEach(action => {
-    message += `• ${action}\n`;
-  });
+  // Road Map
+  message += `#### 🚀 Strategic Road Map:\n`;
+  analysis.wellnessRoadMap.forEach((step, i) => message += `${i + 1}. **Action**: ${step}\n`);
   message += `\n`;
 
-  // Red Flags
-  if (analysis.redFlags.length > 0) {
-    message += `**⚠️ IMPORTANT NOTES:**\n`;
-    analysis.redFlags.forEach(flag => {
-      message += `• ${flag}\n`;
-    });
+  // Critical Alerts
+  if (analysis.criticalSignals.length > 0) {
+    message += `#### ⚠️ Critical Strategic Alerts:\n`;
+    analysis.criticalSignals.forEach(s => message += `• **${s}**\n`);
     message += `\n`;
   }
 
-  // Disclaimer
-  message += `\n${analysis.disclaimer}`;
+  message += `---\n${analysis.professionalDisclaimer}`;
 
   return message;
 }

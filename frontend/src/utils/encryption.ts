@@ -6,10 +6,16 @@
 const ALGORITHM = 'AES-GCM';
 const IV_LENGTH = 12; // Standard for AES-GCM
 
+const keyCache = new Map<string, CryptoKey>();
+
 /**
- * Derives a symmetric key from the user's principal.
+ * Derives a symmetric key from the user's principal, heavily cached for speed.
  */
 async function deriveKey(userPrincipal: string): Promise<CryptoKey> {
+    if (keyCache.has(userPrincipal)) {
+        return keyCache.get(userPrincipal)!;
+    }
+
     const encoder = new TextEncoder();
     const baseKey = await window.crypto.subtle.importKey(
         'raw',
@@ -19,7 +25,7 @@ async function deriveKey(userPrincipal: string): Promise<CryptoKey> {
         ['deriveKey']
     );
 
-    return window.crypto.subtle.deriveKey(
+    const derivedKey = await window.crypto.subtle.deriveKey(
         {
             name: 'PBKDF2',
             salt: encoder.encode('MedicalCare-E2EE-Salt-2026'),
@@ -31,6 +37,9 @@ async function deriveKey(userPrincipal: string): Promise<CryptoKey> {
         false,
         ['encrypt', 'decrypt']
     );
+
+    keyCache.set(userPrincipal, derivedKey);
+    return derivedKey;
 }
 
 /**

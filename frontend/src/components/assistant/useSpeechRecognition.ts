@@ -6,8 +6,11 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isWakeWordDetected, setIsWakeWordDetected] = useState(false);
   const recognitionRef = useRef<any | null>(null);
   const onCommandReadyRef = useRef(onCommandReady);
+  
+  const WAKE_WORDS = ['hey goku', 'goku', 'wake up'];
 
   // Keep the ref updated with the latest callback
   useEffect(() => {
@@ -24,8 +27,8 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
     setIsSupported(true);
     const recognition = new SpeechRecognition();
 
-    // Set continuous to false for a clean "one command" session as requested
-    recognition.continuous = false;
+    // Enable continuous listening for wake word support
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = lang;
 
@@ -42,6 +45,14 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const text = result[0].transcript;
+        
+        // Wake Word Detection
+        const lowerText = text.toLowerCase().trim();
+        if (WAKE_WORDS.some(word => lowerText.includes(word)) && !isWakeWordDetected) {
+            console.log('[Goku Speech] 🚨 Wake Word Detected!');
+            setIsWakeWordDetected(true);
+        }
+
         if (result.isFinal) {
           final += text;
         } else {
@@ -56,8 +67,6 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
         if (onCommandReadyRef.current) {
           onCommandReadyRef.current(final);
         }
-        // Force stop once we have a final command to ensure one beep only
-        recognition.stop();
       }
     };
 
@@ -84,22 +93,23 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
         recognitionRef.current.abort();
       }
     };
-  }, [lang]);
+  }, [lang, isWakeWordDetected]);
 
   const start = useCallback(() => {
     if (!recognitionRef.current) return;
     try {
       setTranscript('');
       setInterimTranscript('');
+      setIsWakeWordDetected(false);
       recognitionRef.current.start();
     } catch (e) {
       console.error('[Goku Speech] Could not start:', e);
-      // If already started, just ignore
     }
   }, []);
 
   const stop = useCallback(() => {
     setIsListening(false);
+    setIsWakeWordDetected(false);
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
@@ -108,6 +118,7 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
   const reset = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
+    setIsWakeWordDetected(false);
   }, []);
 
   return {
@@ -119,9 +130,7 @@ export function useSpeechRecognition(onCommandReady?: (text: string) => void, la
     start,
     stop,
     reset,
-    // Provide empty versions of removed wake feature properties to avoid breaking consumers
-    isWakeWordDetected: false,
-    setIsWakeWordDetected: () => { }
+    isWakeWordDetected,
+    setIsWakeWordDetected
   };
 }
-

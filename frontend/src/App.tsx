@@ -14,6 +14,8 @@ const Profile = lazy(() => import('./pages/Profile'));
 const Report = lazy(() => import('./pages/Report'));
 const Chat = lazy(() => import('./pages/Chat'));
 const Medications = lazy(() => import('./pages/Medications'));
+const Terms = lazy(() => import('./pages/Terms'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const NotFoundRedirect = lazy(() => import('./pages/NotFoundRedirect'));
 
 // Helper to wrap lazy components in Suspense with a loading state
@@ -85,6 +87,18 @@ const medicationsRoute = createRoute({
   component: withSuspense(Medications),
 });
 
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terms',
+  component: withSuspense(Terms),
+});
+
+const privacyPolicyRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/privacy-policy',
+  component: withSuspense(PrivacyPolicy),
+});
+
 const routeTree = rootRoute.addChildren([
   welcomeRoute,
   signInRoute,
@@ -94,6 +108,8 @@ const routeTree = rootRoute.addChildren([
   reportRoute,
   chatRoute,
   medicationsRoute,
+  termsRoute,
+  privacyPolicyRoute,
   rootedNotFoundRoute,
 ]);
 

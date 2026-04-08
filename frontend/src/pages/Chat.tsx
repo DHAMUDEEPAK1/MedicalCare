@@ -6,12 +6,10 @@ import { useAssistantTranscript } from '../components/assistant/useAssistantTran
 import { useAssistantAI } from '../components/assistant/useAssistantAI';
 import { getErrorFallbackResponse } from '../components/assistant/medicalKnowledgeBase';
 import { useMedicalFiles, MedicalFileMetadata } from '../hooks/useMedicalFiles';
-import { extractTextFromBytes } from '../components/assistant/reportTextExtraction';
-import { analyzeReportText, formatAnalysisMessage } from '../components/assistant/reportAnalysis';
-import { summarizeMessage } from '../components/assistant/messageSummarizer';
+import { extractTextFromBytes, extractTextFromPDF } from '../components/assistant/reportTextExtraction';
 import { CloseButton } from '../components/CloseButton';
 import { useRequireAuth } from '../hooks/useRequireAuth';
-import { analyzeFileWithGemini } from '../components/assistant/geminiService';
+import { analyzeFile as analyzeMedicalFile } from '../components/assistant/assistantBrain';
 
 export default function Chat() {
   // Protect this route - redirect to signin if not authenticated
@@ -21,7 +19,7 @@ export default function Chat() {
   const [errorMessage, setErrorMessage] = useState<string>();
   const [inputValue, setInputValue] = useState('');
   const { transcript, addMessage, clearTranscript } = useAssistantTranscript();
-  const { files, getFileBytes } = useMedicalFiles();
+  const { files, downloadFile } = useMedicalFiles();
   const [reportContext, setReportContext] = useState<ReportAnalysisContext>({ state: 'idle' });
   const ai = useAssistantAI();
 
@@ -54,7 +52,7 @@ export default function Chat() {
         addMessage('assistant', `Reading "${selectedFile.filename}"...`);
 
         try {
-          const bytes = await getFileBytes(selectedFile.id);
+          const bytes = await downloadFile(selectedFile.id, selectedFile.filename, true);
           if (!bytes) {
             addMessage('assistant', `I couldn't access that file.`);
             setReportContext({ state: 'idle' });
@@ -63,29 +61,32 @@ export default function Chat() {
 
           const isVisualFile = selectedFile.contentType?.includes('image') || selectedFile.contentType?.includes('pdf') || selectedFile.filename.toLowerCase().endsWith('.pdf');
 
-          if (isVisualFile) {
-            setReportContext({ state: 'analyzing' });
-            addMessage('assistant', `Goku is now analyzing the image/PDF contents using AI... 🧬`);
-
+          if (isVisualFile && (selectedFile.contentType?.includes('pdf') || selectedFile.filename.toLowerCase().endsWith('.pdf'))) {
+            addMessage('assistant', `Reading "${selectedFile.filename}" offline using Local Saiyan Brain... 🛡️`);
             try {
-              const aiAnalysis = await analyzeFileWithGemini(bytes, selectedFile.contentType || 'application/pdf');
-              addMessage('assistant', aiAnalysis);
-              setReportContext({ state: 'idle' });
+              // Convert to File object if needed or just pass selectedFile if it matches expected type
+              const text = await extractTextFromPDF(selectedFile as any);
+              if (text && text.trim()) {
+                const analysisResult = analyzeMedicalFile(selectedFile.filename, text);
+                addMessage('assistant', analysisResult.message, analysisResult.type as any);
+                setReportContext({ state: 'idle' });
+                return;
+              }
             } catch (err) {
-              addMessage('assistant', `My AI analysis engine hit a snag. Please try again or paste the text.`);
-              setReportContext({ state: 'awaiting-paste', selectedReportId: selectedFile.id, selectedReportFilename: selectedFile.filename });
+              console.error('Offline PDF extraction failed:', err);
             }
+          } else if (isVisualFile) {
+            addMessage('assistant', `I'm operating in **Full Offline Fortress Mode** for maximum privacy. 🛡️\n\nI can scan PDFs locally, but for clinical images, please **paste the text** from the report directly into the chat and I will perform a master-warrior diagnostic scan!`);
+            setReportContext({ state: 'awaiting-paste', selectedReportId: selectedFile.id, selectedReportFilename: selectedFile.filename });
             return;
           }
 
-          const extractionResult = await extractTextFromBytes(bytes, selectedFile.filename, selectedFile.contentType);
+          const extractionResult = await extractTextFromBytes(bytes as Uint8Array);
 
           if (extractionResult.success && extractionResult.text) {
             setReportContext({ state: 'analyzing' });
-            const analysis = analyzeReportText(extractionResult.text, selectedFile.filename);
-            const analysisMessage = formatAnalysisMessage(analysis, selectedFile.filename);
-            const summary = summarizeMessage(analysisMessage);
-            addMessage('assistant', analysisMessage, undefined, summary || undefined);
+            const analysisResult = analyzeMedicalFile(selectedFile.filename, extractionResult.text);
+            addMessage('assistant', analysisResult.message, analysisResult.type as any);
             setReportContext({ state: 'idle' });
           } else {
             addMessage('assistant', `I couldn't read the text. Please paste it manually.`);
@@ -109,10 +110,8 @@ export default function Chat() {
         }
 
         setReportContext({ state: 'analyzing' });
-        const analysis = analyzeReportText(pastedText, reportContext.selectedReportFilename || 'Your Report');
-        const analysisMessage = formatAnalysisMessage(analysis, reportContext.selectedReportFilename || 'Your Report');
-        const summary = summarizeMessage(analysisMessage);
-        addMessage('assistant', analysisMessage, undefined, summary || undefined);
+        const analysisResult = analyzeMedicalFile(reportContext.selectedReportFilename || 'Your Report', pastedText);
+        addMessage('assistant', analysisResult.message, analysisResult.type as any);
         setReportContext({ state: 'idle' });
         return;
       }
@@ -153,7 +152,7 @@ export default function Chat() {
       addMessage('assistant', getErrorFallbackResponse());
       setReportContext({ state: 'idle' });
     }
-  }, [addMessage, navigate, reportContext, files, getFileBytes, transcript, ai]);
+  }, [addMessage, navigate, reportContext, files, downloadFile, transcript, ai]);
 
   useEffect(() => {
     const prompt = sessionStorage.getItem('initialChatPrompt');
@@ -191,6 +190,7 @@ export default function Chat() {
             onInputChange={setInputValue}
             onVoiceInput={handleVoiceInput}
             onClearConversation={handleClearConversation}
+            onFileUpload={(file) => ai.processUploadedFile(file, addMessage)}
             autoStartVoice={true}
           />
         </div>

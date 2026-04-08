@@ -4,7 +4,7 @@ import { useInternetIdentity } from './useInternetIdentity';
 import { ExternalBlob, MedicalFileMetadata as BackendMetadata } from '../backend';
 import { encryptData, decryptData } from '../utils/encryption';
 import { auth, storage } from '../lib/firebase';
-import { ref, uploadBytes, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes } from 'firebase/storage';
 import { loadSession } from '../auth/session';
 
 export interface MedicalFileMetadata {
@@ -13,13 +13,85 @@ export interface MedicalFileMetadata {
   size: number;
   uploadedAt: number;
   contentType?: string;
-  source?: 'icp' | 'firebase';
+  source?: 'icp' | 'firebase' | 'local';
 }
 
 const MEDICAL_FILES_QUERY_KEY = 'medicalFiles';
 
+// --- Local IndexedDB Vault Fallback ---
+const DB_NAME = 'MedicalCareVaultDB';
+const STORE_NAME = 'medical_files';
+
+async function getDB(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveToLocalVault(metadata: MedicalFileMetadata, bytes: Uint8Array, userPrincipal: string) {
+  const db = await getDB();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put({ ...metadata, userPrincipal, bytes });
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+async function getLocalVaultFiles(userPrincipal: string): Promise<MedicalFileMetadata[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => {
+      const userFiles = request.result
+        .filter((r: any) => r.userPrincipal === userPrincipal)
+        .map((r: any) => {
+          const { bytes, userPrincipal: _, ...meta } = r;
+          return { ...meta, source: 'local' };
+        });
+      resolve(userFiles);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getLocalVaultFileContent(id: string): Promise<Uint8Array | null> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      resolve(request.result ? request.result.bytes : null);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function deleteFromLocalVault(id: string) {
+  const db = await getDB();
+  return new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
 export function useMedicalFiles() {
-  const { actor, isFetching: actorFetching } = useActor();
+  const { actor } = useActor();
   const { identity } = useInternetIdentity();
   const queryClient = useQueryClient();
 
@@ -32,91 +104,118 @@ export function useMedicalFiles() {
       return auth.currentUser.uid;
     }
     const session = loadSession();
-    if (session?.type === 'guest') {
-      return 'guest-device-vault-stable-id'; // Fallback for local encryption
-    }
-    return null;
+    return session?.phone || session?.type || 'guest-device-vault-stable-id';
   };
 
   const userPrincipal = getStableId();
 
-  // Query to list all medical files using backend metadata
+  // Query to list all medical files using backend metadata + IndexedDB
   const filesQuery = useQuery<MedicalFileMetadata[]>({
     queryKey: [MEDICAL_FILES_QUERY_KEY, userPrincipal],
     queryFn: async () => {
-      // In this version, we primary-list from ICP canister but we could merge Firebase here too
-      if (!actor) return [];
+      let icpFiles: MedicalFileMetadata[] = [];
+      const localFiles = await getLocalVaultFiles(userPrincipal || 'guest');
 
-      try {
-        const backendMetadata = await actor.listMedicalFilesMetadata();
-
-        const filesWithMetadata = backendMetadata.map((meta: BackendMetadata) => ({
-          id: meta.id,
-          filename: meta.filename,
-          size: Number(meta.size),
-          uploadedAt: Number(meta.uploadedAt) / 1_000_000,
-          contentType: meta.contentType || undefined,
-          source: 'icp' as const,
-        }));
-
-        filesWithMetadata.sort((a, b) => b.uploadedAt - a.uploadedAt);
-        return filesWithMetadata;
-      } catch (error) {
-        console.error('Failed to list medical files:', error);
-        return [];
+      // Attempt ICP
+      if (actor && identity && !identity.getPrincipal().isAnonymous()) {
+        try {
+          const backendMetadata = await actor.listMedicalFilesMetadata();
+          icpFiles = backendMetadata.map((meta: BackendMetadata) => ({
+            id: meta.id,
+            filename: meta.filename,
+            size: Number(meta.size),
+            uploadedAt: Number(meta.uploadedAt) / 1_000_000,
+            contentType: meta.contentType || undefined,
+            source: 'icp' as const,
+          }));
+        } catch (error) {
+          console.error('Failed to list medical files from ICP:', error);
+        }
       }
+
+      // Merge local fallback and ICP files safely
+      const allFiles = [...icpFiles];
+      const icpIds = new Set(icpFiles.map(f => f.id));
+      for (const lf of localFiles) {
+        if (!icpIds.has(lf.id)) {
+          allFiles.push(lf);
+        }
+      }
+
+      allFiles.sort((a, b) => b.uploadedAt - a.uploadedAt);
+      return allFiles;
     },
-    enabled: !!actor && !actorFetching,
+    enabled: true,
   });
 
-  // Mutation to upload a file (Dual-Storage E2EE)
+  // Mutation to upload a file (Dual-Storage E2EE + Local Fallback)
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      if (!userPrincipal) throw new Error('No user identity found for encryption keys');
-
+      const uId = userPrincipal || 'guest';
       const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const arrayBuffer = await file.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
 
       // --- E2EE Encryption ---
-      // Encrypted locally using the user's ID as the key base
-      const encryptedBytes = await encryptData(bytes, userPrincipal);
-
-      // --- 1. Firebase Storage Upload ---
-      // This fulfills the "Save in Firebase with E2EE" request
-      try {
-        const firebaseRef = ref(storage, `medical_records/${userPrincipal}/${fileId}_${file.name}`);
-        await uploadBytes(firebaseRef, encryptedBytes);
-        console.log('[E2EE Vault] Securely uploaded to Firebase');
-      } catch (err) {
-        console.warn('Firebase upload failed, falling back to canister only', err);
-      }
-
-      // --- 2. ICP Canister Upload ---
-      if (actor) {
-        try {
-          const blob = ExternalBlob.fromBytes(encryptedBytes);
-          await actor.uploadMedicalFile(
-            fileId,
-            blob,
-            file.name,
-            BigInt(encryptedBytes.length),
-            file.type || null
-          );
-          console.log('[E2EE Vault] Securely uploaded to ICP Canister');
-        } catch (err) {
-          console.error('ICP upload failed', err);
-          // If firebase worked, we might considered it a success, but usually we want at least one to succeed
-        }
-      }
-
-      return {
+      const encryptedBytes = await encryptData(bytes, uId);
+      const meta: MedicalFileMetadata = {
         id: fileId,
         filename: file.name,
         size: encryptedBytes.length,
         uploadedAt: Date.now(),
         contentType: file.type || undefined,
+        source: 'local'
       };
+
+      // 1. Save to Local IndexedDB instantly
+      await saveToLocalVault(meta, encryptedBytes, uId);
+
+      // 2. Fire-And-Forget Background Remote Uploads
+      // Execute the heavy network calls in the background without blocking the UI!
+      Promise.all([
+        (async () => {
+          try {
+            const firebaseRef = ref(storage, `medical_records/${uId}/${fileId}_${file.name}`);
+            await uploadBytes(firebaseRef, encryptedBytes);
+            console.log('[E2EE Vault] Securely uploaded to Firebase');
+            return true;
+          } catch (err) {
+            console.warn('Firebase upload failed in background', err);
+            return false;
+          }
+        })(),
+        (async () => {
+          if (actor && identity && !identity.getPrincipal().isAnonymous()) {
+            try {
+              const blob = ExternalBlob.fromBytes(new Uint8Array(encryptedBytes));
+              await actor.uploadMedicalFile(
+                fileId,
+                blob,
+                file.name,
+                BigInt(encryptedBytes.length),
+                file.type || null
+              );
+              console.log('[E2EE Vault] Securely uploaded to ICP Canister');
+              return true;
+            } catch (err) {
+              console.error('ICP upload failed in background', err);
+              return false;
+            }
+          }
+          return false;
+        })()
+      ]).then(([fbSuccess, icpSuccess]) => {
+         // Optionally update the local vault's source tracking and trigger a background UI refresh
+         if (fbSuccess || icpSuccess) {
+           const updatedMeta = { ...meta, source: icpSuccess ? 'icp' : 'firebase' } as MedicalFileMetadata;
+           saveToLocalVault(updatedMeta, encryptedBytes, uId)
+            .then(() => queryClient.invalidateQueries({ queryKey: [MEDICAL_FILES_QUERY_KEY] }))
+            .catch(console.error);
+         }
+      });
+
+      // 3. Instantly return so the user doesn't wait for network uploads!
+      return meta;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [MEDICAL_FILES_QUERY_KEY] });
@@ -126,15 +225,12 @@ export function useMedicalFiles() {
   // Mutation to delete a file
   const deleteMutation = useMutation({
     mutationFn: async (fileId: string) => {
-      if (!actor || !userPrincipal) throw new Error('Actor or ID not available');
-
-      // 1. Delete from ICP
-      await actor.deleteMedicalFile(fileId).catch(e => console.error('ICP Delete failed', e));
-
-      // 2. Delete from Firebase (optional but good practice)
-      // Note: This requires storing the full filename or searching, but we'll try a best-effort delete if we had it
-      // For now, canister deletion is the source of truth for the UI list.
-
+      if (actor && identity && !identity.getPrincipal().isAnonymous()) {
+        await actor.deleteMedicalFile(fileId).catch((e: unknown) => console.error('ICP Delete failed', e));
+      }
+      
+      // Delete from local cache
+      await deleteFromLocalVault(fileId);
       return fileId;
     },
     onSuccess: () => {
@@ -143,18 +239,33 @@ export function useMedicalFiles() {
   });
 
   const downloadFile = async (fileId: string, filename: string, onlyReturnBytes = false): Promise<Uint8Array | void> => {
-    if (!actor || !userPrincipal) throw new Error('Vault access denied - Identity mismatch');
+    const uId = userPrincipal || 'guest';
+    let encryptedBytes: Uint8Array | null = null;
+    
+    // Opt for fast local load first
+    encryptedBytes = await getLocalVaultFileContent(fileId);
+
+    if (!encryptedBytes && actor && identity && !identity.getPrincipal().isAnonymous()) {
+      try {
+        const blob = await actor.getMedicalFile(fileId);
+        if (blob) {
+          encryptedBytes = await blob.getBytes();
+        }
+      } catch (e) {
+        console.warn('Failed to download from ICP vault', e);
+      }
+    }
+
+    if (!encryptedBytes) {
+      throw new Error('File not found in vault or local fallback cache.');
+    }
 
     try {
-      const blob = await actor.getMedicalFile(fileId);
-      if (!blob) throw new Error('File not found in vault');
-
-      const encryptedBytes = await blob.getBytes();
-      const decryptedBytes = await decryptData(encryptedBytes, userPrincipal);
+      const decryptedBytes = await decryptData(encryptedBytes, uId);
 
       if (onlyReturnBytes) return decryptedBytes;
 
-      const fileBlob = new Blob([decryptedBytes]);
+      const fileBlob = new Blob([decryptedBytes as any]);
       const url = URL.createObjectURL(fileBlob);
       const link = document.createElement('a');
       link.href = url;
@@ -164,8 +275,8 @@ export function useMedicalFiles() {
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 100);
     } catch (error) {
-      console.error('Vault access error:', error);
-      throw error;
+      console.error('Vault extraction error:', error);
+      throw new Error('Decryption failed. The file is corrupted or keys mismatch.');
     }
   };
 

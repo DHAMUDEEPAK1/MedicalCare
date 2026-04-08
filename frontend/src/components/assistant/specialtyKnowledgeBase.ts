@@ -678,7 +678,7 @@ export const specialtyKnowledgeBase: Record<string, SpecialtyEntry> = {
     keywords: [
       'gynecology', 'gynecologist', 'pregnancy', 'pregnant', 'menstruation',
       'period', 'menstrual', 'ovary', 'uterus', 'cervix', 'vagina',
-      'PCOS', 'polycystic ovary', 'endometriosis', 'fibroids', 'menopause',
+      'PCOS', 'PCOD', 'polycystic ovary', 'polycystic ovarian syndrome', 'endometriosis', 'fibroids', 'menopause',
       'perimenopause', 'contraception', 'birth control', 'IUD', 'fertility',
       'infertility', 'IVF', 'prenatal', 'antenatal', 'postpartum',
       'pap smear', 'HPV', 'STI', 'STD', 'pelvic pain', 'vaginal discharge',

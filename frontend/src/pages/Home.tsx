@@ -212,22 +212,22 @@ export default function Home() {
   };
 
   return (
-    <div className="space-y-8 pb-24 px-4 pt-4">
-      <div className="space-y-2">
+    <div className="max-w-6xl mx-auto px-4 space-y-8 pb-24 pt-4">
+      <div className="space-y-2 flex flex-col items-center text-center">
         <PageTitle>Health Dashboard</PageTitle>
-        <BodyText className="text-muted-foreground">
+        <BodyText className="text-muted-foreground max-w-lg">
           Your personalized wellness overview.
         </BodyText>
       </div>
 
       {/* Ask Goku Quick Bar */}
-      <section>
+      <section className="max-w-3xl mx-auto w-full">
         <form onSubmit={handleAskGoku} className="relative group">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
             <Sparkles className="h-5 w-5 text-primary animate-pulse" />
           </div>
           <Input
-            className="w-full pl-10 pr-24 h-14 rounded-2xl border-2 border-primary/20 bg-card shadow-sm text-base focus-visible:ring-primary focus-visible:border-primary transition-all duration-300"
+            className="w-full pl-10 pr-24 h-14 rounded-2xl border-2 border-primary/20 bg-card shadow-md text-base focus-visible:ring-primary focus-visible:border-primary transition-all duration-300"
             placeholder="Ask Goku to analyze a report, add a medication, or check symptoms..."
             value={gokuInput}
             onChange={(e) => setGokuInput(e.target.value)}
@@ -256,7 +256,7 @@ export default function Home() {
       </section>
 
       {/* AI Health Hub */}
-      <section>
+      <section className="max-w-4xl mx-auto w-full">
         <DesignBSurface variant="elevated" className="p-5 border-l-4 border-primary bg-primary/5 relative overflow-hidden group transition-all hover:bg-primary/10">
           <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover:rotate-12 transition-transform">
             <Sparkles size={80} />
@@ -293,7 +293,7 @@ export default function Home() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 px-2">
           <DashboardTile
             icon={Heart}
             label="Pulse"
