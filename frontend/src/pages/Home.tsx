@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Send, Mic } from 'lucide-react';
 import { BleClient, numberToUUID } from '@capacitor-community/bluetooth-le';
+import { HealthRiskAssessment } from '../components/HealthRiskAssessment';
 
 const HEART_RATE_SERVICE = numberToUUID(0x180D);
 const HEART_RATE_MEASUREMENT_CHARACTERISTIC = numberToUUID(0x2A37);
@@ -323,6 +324,9 @@ export default function Home() {
             caption="Suggested for you"
           />
         </div>
+      {/* Health Risk Assessment Section */}
+      <section className="max-w-4xl mx-auto w-full">
+        <HealthRiskAssessment />
       </section>
 
       {/* Quick Access */}

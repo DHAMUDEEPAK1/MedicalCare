@@ -1,0 +1,1 @@
+import{j as o}from"./vendor-ui-DiXlCXrQ.js";import{c as a}from"./index-EyBlxLC0.js";function c({children:e,variant:r="default",className:d}){return o.jsx("div",{className:a("rounded-lg transition-all",{"bg-card":r==="default","bg-card shadow-md":r==="elevated","bg-card border border-border":r==="outlined"},d),children:e})}export{c as D};

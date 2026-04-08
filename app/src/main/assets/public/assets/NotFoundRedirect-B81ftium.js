@@ -1,0 +1,1 @@
+import{r as e}from"./vendor-ui-DiXlCXrQ.js";import{u as r,M as a}from"./index-EyBlxLC0.js";import"./vendor-icp-BXgn1ktJ.js";function c(){const t=r(),o=a();return e.useEffect(()=>{t({to:"/home",replace:!0})},[t,o]),null}export{c as default};
