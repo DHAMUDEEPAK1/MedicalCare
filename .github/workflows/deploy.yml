@@ -1,4 +1,5 @@
 name: Deploy MedicalCare Frontend to Cloud Run
+# Trigger: Fresh build with updated secrets
 
 on:
   push:
