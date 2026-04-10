@@ -8,8 +8,8 @@ export default function PrivacyPolicy() {
 
   return (
     <div className="container max-w-4xl mx-auto px-4 py-8 md:py-16">
-      <Button 
-        variant="ghost" 
+      <Button
+        variant="ghost"
         onClick={() => navigate({ to: '/' })}
         className="mb-8 gap-2 hover:bg-primary/10 transition-colors"
       >
@@ -36,8 +36,8 @@ export default function PrivacyPolicy() {
             <SectionTitle>1. Data Transparency</SectionTitle>
           </div>
           <BodyText>
-            At HealthCare, your privacy is our highest priority. This policy explains how we collect, 
-            use, and protect your personal and health data. We are committed to transparency in all 
+            At HealthCare, your privacy is our highest priority. This policy explains how we collect,
+            use, and protect your personal and health data. We are committed to transparency in all
             our data practices.
           </BodyText>
         </section>
@@ -57,11 +57,11 @@ export default function PrivacyPolicy() {
               <strong>Account Information:</strong> Name, email address, and authentication data.
             </li>
             <li>
-              <strong>Health Data:</strong> Vital signs, symptoms, medications, and health history 
+              <strong>Health Data:</strong> Vital signs, symptoms, medications, and health history
               that you explicitly enter or sync from connected devices.
             </li>
             <li>
-              <strong>Interaction Data:</strong> Logs of your conversations with Goku AI to improve 
+              <strong>Interaction Data:</strong> Logs of your conversations with Goku AI to improve
               personalized responses.
             </li>
           </ul>
@@ -84,7 +84,7 @@ export default function PrivacyPolicy() {
             <div className="p-5 rounded-2xl bg-card border shadow-sm">
               <h4 className="font-semibold mb-2">Private AI</h4>
               <p className="text-sm text-muted-foreground">
-                Your AI consultations are processed with strict privacy controls and are not used to 
+                Your AI consultations are processed with strict privacy controls and are not used to
                 adversely affect your insurance or employment.
               </p>
             </div>
@@ -99,8 +99,8 @@ export default function PrivacyPolicy() {
             <SectionTitle>4. Data Sharing</SectionTitle>
           </div>
           <BodyText>
-            We do NOT sell your personal health information to third parties. We only share 
-            information when necessary to provide the Service, comply with the law, or 
+            We do NOT sell your personal health information to third parties. We only share
+            information when necessary to provide the Service, comply with the law, or
             protect our rights.
           </BodyText>
         </section>
@@ -113,14 +113,14 @@ export default function PrivacyPolicy() {
             <SectionTitle>5. Your Rights</SectionTitle>
           </div>
           <BodyText>
-            You have the right to access, update, or delete your data at any time through your 
+            You have the right to access, update, or delete your data at any time through your
             profile settings. You can also request a full export of your health history.
           </BodyText>
         </section>
 
         <footer className="pt-12 border-t text-center">
           <BodyText className="text-muted-foreground italic">
-            Privacy concerns? Contact our Data Protection Officer at privacy@yourdomain.com
+            Privacy concerns? Contact our Data Protection Officer at privacy @medicalcare-1721.vercel.app
           </BodyText>
         </footer>
       </div>
